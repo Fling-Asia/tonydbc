@@ -2,6 +2,8 @@
 
 Latest version: 1.0.2
 
+Available on PyPI: https://pypi.org/project/tonydbc/
+
 2024-01-07: [Release announcement on Medium](https://mcurrie-59915.medium.com/introducing-tonydbc-a-high-level-database-connector-for-mariadb-python-and-pandas-8600676fbf88)
 
 Supports high-level database operations within Python.  TonyDBC is short for Tony’s Database Connector, named for Maria’s lover in West Side Story.
@@ -28,6 +30,8 @@ To install TonyDBC from PyPI:
 pip install tonydbc
 ```
 
+### Usage
+
 A typical use case:
 
 ```python
@@ -44,7 +48,7 @@ sql_params = {
     "port": int(os.environ["MYSQL_PORT"]),
 }
 
-with TonyDBC(***sql_params) as db:
+with TonyDBC(**sql_params) as db:
     # Do stuff
     pass
 ```
