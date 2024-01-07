@@ -3,10 +3,10 @@ python-dotenv
 more-itertools
 jsonschema
 requests
-numpy==1.23.5
+numpy>=1.23.5
 pandas
 paho-mqtt
 mariadb
 pyperclip
 tzlocal
-paho-mqtt==1.6.1
+paho-mqtt>=1.6.1

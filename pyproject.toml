@@ -1,0 +1,41 @@
+# pyproject.toml
+
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "tonydbc"
+version = "1.0.0"
+description = "A high-level database connector for MariaDB"
+readme = "README.md"
+authors = [{ name = "Michael Currie", email = "mcurrie@gmail.com" }]
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+]
+keywords = ["mariadb", "database", "connector", "ODBC", "pandas"]
+dependencies = [
+    "iteration_utilities"
+    "python-dotenv"
+    "more-itertools"
+    "jsonschema"
+    "requests"
+    "numpy>=1.23.5"
+    "pandas"
+    "paho-mqtt"
+    "mariadb"
+    "pyperclip"
+    "tzlocal"
+    "paho-mqtt>=1.6.1"
+]
+requires-python = ">=3.8"
+
+[project.optional-dependencies]
+dev = ["black", "bumpver", "isort", "pip-tools", "pytest"]
+
+[project.urls]
+Homepage = "https://github.com/Fling-Asia/tonydbc"
