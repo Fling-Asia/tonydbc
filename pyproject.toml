@@ -19,17 +19,17 @@ classifiers = [
 ]
 keywords = ["mariadb", "database", "connector", "ODBC", "pandas"]
 dependencies = [
-    "iteration_utilities"
-    "python-dotenv"
-    "more-itertools"
-    "jsonschema"
-    "requests"
-    "numpy>=1.23.5"
-    "pandas"
-    "paho-mqtt"
-    "mariadb"
-    "pyperclip"
-    "tzlocal"
+    "iteration_utilities",
+    "python-dotenv",
+    "more-itertools",
+    "jsonschema",
+    "requests",
+    "numpy>=1.23.5",
+    "pandas",
+    "paho-mqtt",
+    "mariadb",
+    "pyperclip",
+    "tzlocal",
     "paho-mqtt>=1.6.1"
 ]
 requires-python = ">=3.8"
@@ -39,3 +39,27 @@ dev = ["black", "bumpver", "isort", "pip-tools", "pytest"]
 
 [project.urls]
 Homepage = "https://github.com/Fling-Asia/tonydbc"
+
+[tool.bumpver]
+current_version = "1.0.0"
+version_pattern = "MAJOR.MINOR.PATCH"
+commit_message = "bump version {old_version} -> {new_version}"
+tag_message = "{new_version}"
+tag_scope = "default"
+pre_commit_hook = ""
+post_commit_hook = ""
+commit = true
+tag = true
+push = true
+
+[tool.bumpver.file_patterns]
+"pyproject.toml" = [
+    'version = "{version}"',
+    'current_version = "{version}"'
+]
+"README.md" = [
+    "{version}"
+]
+"src/tonydbc/__init__.py" = [
+'__version__ = "{version}"'
+]

@@ -1,5 +1,7 @@
 # TonyDBC
 
+Latest version: 1.0.0
+
 2024-01-07: [Release announcement on Medium](https://mcurrie-59915.medium.com/introducing-tonydbc-a-high-level-database-connector-for-mariadb-python-and-pandas-8600676fbf88)
 
 Supports high-level database operations within Python.  TonyDBC is short for Tony’s Database Connector, named for Maria’s lover in West Side Story.
