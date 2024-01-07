@@ -13,7 +13,7 @@ import dotenv
 import pathlib
 from collections import Counter
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 
 # Needs an extra .. for some reason (I guess if this library is imported...)
 DEFAULT_ENV_FILEPATH = os.path.join(os.path.abspath(__file__), "..", "..", "..", ".env")
