@@ -1162,6 +1162,19 @@ class TonyDBC(__TonyDBCOnlineOnly):
 ## I/O for converting between CSV and database tables and pandas DataFrames
 
 
+def json_dumps_numpy(x):
+    # Handle numpy arrays as well as regular nested lists
+    if type(x) is np.ndarray:
+        x = x.tolist()
+
+    # When appending to the database, json.dumps will complain if this isn't a proper int
+    # so get rid of the np.int32 format here:
+    if type(x) == list:
+        x = [int(xx) if np.issubdtype(type(xx), np.integer) else xx for xx in x]
+
+    return json.dumps(x)
+
+
 def serialize_table(cur_df, col_dtypes, columns_to_serialize: typing.List[str]):
     # If we don't make a copy, we will create side effects in the original cur_df
     cur_df = cur_df.copy()
@@ -1174,12 +1187,6 @@ def serialize_table(cur_df, col_dtypes, columns_to_serialize: typing.List[str]):
     columns_to_serialize0 = list(
         set(cur_df.columns).intersection(set(columns_to_serialize))
     )
-
-    def json_dumps_numpy(x):
-        # Handle numpy arrays as well as regular nested lists
-        if type(x) is np.ndarray:
-            x = x.tolist()
-        return json.dumps(x)
 
     # Serialize the relevant columns from strings into nested arrays of dicts and lists
     for c in columns_to_serialize0:
