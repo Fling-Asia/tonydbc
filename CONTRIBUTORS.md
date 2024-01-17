@@ -11,7 +11,7 @@ If you are a contributor and want an [editable install](https://peps.python.org/
 To publish a new version of tonydbc to PyPI:
 
 1. Get an API token at PyPI
-2. Save the token to `C:\Users\<username>\.pyprc`:
+2. Save the token with filled-in `<password>` to `C:\Users\<username>\.pyprc`:
 
 ```
 [pypi]

@@ -114,15 +114,22 @@ class DataFrameFast(pd.DataFrame):
                 # e.g. "+07:00"
 
             for dt_col in dt_cols.keys():
-                # I think this is okay if we were careful to have the column's data in the current session's
-                # datetime format
-                df0.loc[:, dt_col] = (
+                # I think this is okay if we were careful to have the column's data
+                # in the current session's datetime format
+                new_col = (
                     df0.loc[:, dt_col]
                     # Convert to the correct time zone if necessary
                     .dt.tz_convert(time_zone)
                     # Convert to a string for mariadb to digest
                     .dt.strftime("%Y-%m-%d %H:%M:%S.%f")
                 )
+
+                # Force the dtype conversion, which otherwise doesn't happen for some reason
+                df0.loc[:, dt_col] = ""
+                df0.loc[:, dt_col] = "override"
+                df0.loc[:, dt_col] = df0.loc[:, dt_col].astype(str)
+                # Now assign the string date information
+                df0.loc[:, dt_col] = new_col
 
         # Convert np.int64 columns to np.int32 since MySQL cannot accept np.int64 as a param
         small_int64cols = {

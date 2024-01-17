@@ -17,6 +17,9 @@ __version__ = "1.0.3"
 
 # Needs an extra .. for some reason (I guess if this library is imported...)
 DEFAULT_ENV_FILEPATH = os.path.join(os.path.abspath(__file__), "..", "..", "..", ".env")
+DEFAULT_ENV_FILEPATH = os.path.join(
+    os.path.abspath(__file__), "..", "..", "..", "..", "FLING.AI", ".env"
+)
 
 
 def check_duplicate_keys(dotenv_path):
