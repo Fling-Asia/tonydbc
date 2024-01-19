@@ -5,6 +5,14 @@ A context manager for mariadb data connections.
 
 On import, also checks that in the env filepath and example env filepath are consistent.
 
+Note: you MUST have variables like MYSQL_READWRITE_USER in your PATH before `import tonydbc`
+
+e.g. 
+import dotenv
+dotenv.load_dotenv(os.path.join(sys.path[0], "..", "..", ".env"))
+sys.path.insert(1, os.path.join(sys.path[0], ".."))
+import tonydbc
+
 """
 import code
 import os
@@ -14,12 +22,6 @@ import pathlib
 from collections import Counter
 
 __version__ = "1.0.3"
-
-# Needs an extra .. for some reason (I guess if this library is imported...)
-DEFAULT_ENV_FILEPATH = os.path.join(os.path.abspath(__file__), "..", "..", "..", ".env")
-DEFAULT_ENV_FILEPATH = os.path.join(
-    os.path.abspath(__file__), "..", "..", "..", "..", "FLING.AI", ".env"
-)
 
 
 def check_duplicate_keys(dotenv_path):
@@ -46,7 +48,7 @@ def check_duplicate_keys(dotenv_path):
         )
 
 
-def check_environment_variable_integrity(env_filepath=DEFAULT_ENV_FILEPATH):
+def check_environment_variable_integrity(env_filepath):
     # Validate that the .env file has all the latest environment variables
     assert env_filepath.endswith(".env")
 
@@ -104,8 +106,10 @@ dotenv.load_dotenv()
 
 # In some contexts, like docker on the server, it's annoying to check environment integrity
 # so let's do it only optionally
-if "CHECK_ENVIRONMENT_INTEGRITY" in os.environ and get_env_bool2(
-    "CHECK_ENVIRONMENT_INTEGRITY"
+if (
+    "CHECK_ENVIRONMENT_INTEGRITY" in os.environ
+    and get_env_bool2("CHECK_ENVIRONMENT_INTEGRITY")
+    and "DEFAULT_ENV_FILEPATH" in os.environ
 ):
     # Check environment variables are good.
     check_environment_variable_integrity()
