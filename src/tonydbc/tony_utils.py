@@ -5,7 +5,6 @@ Support utilities for TonyDBC:
     deserialize_table
     get_current_time
     get_current_time_string
-    get_env_bool
     set_MYSQL_DATABASE
     iso_timestamp_to_utc
     get_tz_offset
@@ -23,6 +22,7 @@ import numpy as np
 import pandas as pd
 import datetime
 import dateutil
+from .env_utils import get_env_bool
 
 
 def json_dumps_numpy(x):
@@ -149,17 +149,6 @@ def get_current_time(use_utc=False):
 
 def get_current_time_string(use_utc=False):
     return get_current_time(use_utc).strftime("%Y-%m-%d %H:%M:%S")
-
-
-def get_env_bool(key):
-    """Handles the case of a boolean environment variable"""
-    if not key in os.environ:
-        raise KeyError(f"No environment variable {key}")
-
-    if not os.environ[key] in ("True", "False"):
-        raise AssertionError(f"Key {key} is not proper boolean: {os.environ[key]}")
-
-    return os.environ[key] == "True"
 
 
 def set_MYSQL_DATABASE():

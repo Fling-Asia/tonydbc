@@ -5,7 +5,7 @@ import typing
 import os
 import pathlib
 import pyperclip
-from .tonydbc import TonyDBC, PRODUCTION_DATABASES
+from .tonydbc import TonyDBC
 
 
 def run_scripts(test_db: str, schema_filepaths):
@@ -61,17 +61,18 @@ def create_test_database(
         if not pathlib.Path(schema_filepath).suffix.lower() == ".sql":
             raise AssertionError(f"Schema file {schema_filepath} does not end in .sql.")
 
-    if test_db in PRODUCTION_DATABASES:
-        raise AssertionError(
-            f"DANGER DANGER!  You set the test_db to be {test_db}, "
-            f"one of our production databases!  You were about to drop the production "
-            f"database! Please talk to your manager for advice on what to do.  "
-            f"  Do NOT bypass this error."
-        )
-
     program_to_run = ""
 
     with TonyDBC(host=host, user=user, password=password, database=source_db) as db:
+        if test_db in db.production_databases:
+            raise AssertionError(
+                f"DANGER DANGER!  You set the test_db to be {test_db}, "
+                f"one of our production databases ({db.production_databases})! "
+                f"You were about to drop the production database! "
+                f"Please talk to your manager for advice on what to do. "
+                f"Do NOT bypass this error."
+            )
+
         if test_db in db.databases:
             program_to_run += f"DROP DATABASE {test_db};\n"
 

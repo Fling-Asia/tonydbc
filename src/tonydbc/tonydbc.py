@@ -3,6 +3,10 @@ A very convenient library, which contains:
 
     TonyDBC: A context manager class for MariaDB
 
+To protect certain databases against accidental deletion, please set in your .env:
+
+    PRODUCTION_DATABASES = ["important_db", "other_important_db"]
+
 """
 import os
 import io
@@ -32,24 +36,12 @@ from .tony_utils import (
     get_current_time_string,
     get_tz_offset,
 )
+from .env_utils import get_env_list
 
 NULL = mariadb.constants.INDICATOR.NULL
 
-MAX_QUEUE_SIZE = 100000
-
 # Max number of times to re-try a command if connection is lost
 MAX_RECONNECTION_ATTEMPTS = 3
-
-# Protect these databases - test harness will check to ensure
-# it doesn't try to drop these databases (will raise AssertionError)
-PRODUCTION_DATABASES = [
-    "fling_db",
-    "test_db",
-    "information_schema",
-    "mysql",
-    "performance_schema",
-    "sys",
-]
 
 
 class __TonyDBCOnlineOnly:
@@ -476,8 +468,31 @@ class __TonyDBCOnlineOnly:
     def show_grants(self, username: str, host="%"):
         return self.get_data(f"SHOW GRANTS FOR '{username}'@'{host}';")
 
+    @property
+    def production_databases(self):
+        try:
+            return self.__production_databases
+        except AttributeError:
+            # Protect these databases - test harness will check to ensure
+            # it doesn't try to drop these databases (will raise AssertionError)
+            if "PRODUCTION_DATABASES" in os.environ:
+                dbs = get_env_list("PRODUCTION_DATABASES")
+            else:
+                dbs = []
+
+            dbs += [
+                "information_schema",
+                "mysql",
+                "performance_schema",
+                "sys",
+            ]
+            # Remove duplicates
+            self.__production_databases = sorted(set(dbs))
+
+            return self.__production_databases
+
     def drop_database(self, database):
-        if database in PRODUCTION_DATABASES:
+        if database in self.production_databases:
             raise AssertionError(
                 f"DANGER DANGER!  You are trying to drop {database}, "
                 "a production database. Please talk to your manager for advice on what "
@@ -835,9 +850,16 @@ class TonyDBC(__TonyDBCOnlineOnly):
     """
 
     def __init__(self, *args, **kwargs):
+        mb = "MEDIA_BASE_PATH_PRODUCTION"
+        if mb in os.environ:
+            pickle_base_path = os.environ[mb]
+        else:
+            # Default to the script path if no pickle path was provided
+            pickle_base_path = sys.path[0]
+
         self.__offline_status = "online"
         self.__offline_pickle_path = os.path.join(
-            os.environ["MEDIA_BASE_PATH_PRODUCTION"], "dbcon_pickle.PICKLE"
+            pickle_base_path, "dbcon_pickle.PICKLE"
         )
         self.__update_queue = queue.Queue()
         super().__init__(*args, **kwargs)
