@@ -35,10 +35,9 @@ pip install tonydbc
 A typical use case:
 
 ```python
-import dotenv
-from tonydbc import TonyDBC
+from tonydbc import TonyDBC, load_dotenvs
 
-dotenv.load_dotenv()
+load_dotenvs()
 
 sql_params = {
     "host": os.environ["MYSQL_HOST"],
