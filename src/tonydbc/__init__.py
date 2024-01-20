@@ -23,7 +23,7 @@ e.g.
     import tonydbc
 
 """
-__version__ = "1.0.3"
+__version__ = "1.0.4"
 
 from .tonydbc import TonyDBC
 from .tony_utils import (
