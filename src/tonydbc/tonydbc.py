@@ -8,7 +8,9 @@ To protect certain databases against accidental deletion, please set in your .en
     PRODUCTION_DATABASES = ["important_db", "other_important_db"]
 
 """
+
 import os
+import sys
 import io
 import code
 import json
@@ -42,6 +44,24 @@ NULL = mariadb.constants.INDICATOR.NULL
 
 # Max number of times to re-try a command if connection is lost
 MAX_RECONNECTION_ATTEMPTS = 3
+
+
+def check_connection(fn):
+    def conn_wrapper(self, *args, **kwargs):
+        try:
+            self._mariatonydbcn.ping()
+            _ping_str = "Ping success"
+        except mariadb.Error:
+            _ping_str = "Ping failed: Restarting mariadb connection"
+            self._mariatonydbcn = mariadb.connect(self.connection_params)
+        if self._l is None:
+            print(_ping_str)
+        else:
+            self._l.info(_ping_str)
+        result = fn(self, *args, **kwargs)
+        return result
+
+    return conn_wrapper
 
 
 class __TonyDBCOnlineOnly:
@@ -865,6 +885,7 @@ class TonyDBC(__TonyDBCOnlineOnly):
         super().__init__(*args, **kwargs)
 
     @property
+    @check_connection
     def is_online(self):
         return self.__offline_status != "offline"
 
