@@ -11,7 +11,6 @@ NOTE: Works only with mariadb's connector for now (pip3 install mariadb)
     https://mariadb.com/resources/blog/how-to-connect-python-programs-to-mariadb/
 
 """
-
 import code
 import numpy as np
 import pandas as pd
