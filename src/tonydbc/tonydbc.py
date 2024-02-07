@@ -93,7 +93,7 @@ class __TonyDBCOnlineOnly:
                                     while running an SQL command.
         """
         required_fields = [host, user, password, database, port]
-        if any(k is None or (type( str and k == "") for k in required_fields):
+        if any(k is None or (type(k) == 'str' and k == "") for k in required_fields):
             raise AssertionError("TonyDBC: Not all credentials provided.")
 
         self.host = host
@@ -882,6 +882,7 @@ class TonyDBC(__TonyDBCOnlineOnly):
         super().__init__(*args, **kwargs)
 
     @property
+    @check_connection
     def is_online(self):
         return self.__offline_status != "offline"
 
