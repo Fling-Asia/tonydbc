@@ -44,6 +44,23 @@ NULL = mariadb.constants.INDICATOR.NULL
 MAX_RECONNECTION_ATTEMPTS = 3
 
 
+def check_connection(fn):
+    def conn_wrapper(self, *args, **kwargs):
+        try:
+            self._mariatonydbcn.ping()
+        except mariadb.Error:
+            _ping_str = "Ping failed: Restarting mariadb connection"
+            self._mariatonydbcn = mariadb.connect(self.connection_params)
+            if self._l is None:
+                print(_ping_str)
+            else:
+                self._l.info(_ping_str)
+        result = fn(self, *args, **kwargs)
+        return result
+
+    return conn_wrapper
+
+
 class __TonyDBCOnlineOnly:
     """
     Generic context manager for a database connection and for several
@@ -865,6 +882,7 @@ class TonyDBC(__TonyDBCOnlineOnly):
         super().__init__(*args, **kwargs)
 
     @property
+    @check_connection
     def is_online(self):
         return self.__offline_status != "offline"
 
