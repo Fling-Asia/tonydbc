@@ -93,7 +93,7 @@ class __TonyDBCOnlineOnly:
                                     while running an SQL command.
         """
         required_fields = [host, user, password, database, port]
-        if any(k is None or (type(k) == 'str' and k == "") for k in required_fields):
+        if any(k is None or (type(k) == str and k == "") for k in required_fields):
             raise AssertionError("TonyDBC: Not all credentials provided.")
 
         self.host = host
