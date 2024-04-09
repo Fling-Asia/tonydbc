@@ -257,3 +257,5 @@ def load_dotenvs():
             print(f"Checking environment integrity on {p}")
             # Check environment variables are consistent between .env and .env.example
             check_environment_variable_integrity(p)
+    return paths
+
