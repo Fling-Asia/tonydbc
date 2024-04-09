@@ -19,11 +19,22 @@ load_dotenvs() is all you need in most cases
 import code
 import os
 import sys
+import logging
 import dotenv
 from dotenv import load_dotenv
 import json
 import pathlib
 from collections import Counter
+
+
+# We need this to capture the logging warning "Python-dotenv could not parse statement starting at line 1"
+class CaptureLogsHandler(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self.messages = []
+
+    def emit(self, record):
+        self.messages.append(record.getMessage())
 
 
 def check_duplicate_keys(dotenv_path):
@@ -71,25 +82,64 @@ def check_environment_variable_integrity(env_filepath):
             f"{pathlib.Path(env_filepath).parent}\n"
         )
 
+    # We need this to capture the logging warning
+    # "Python-dotenv could not parse statement starting at line 1"
+    # Create the custom logging handler
+    dotenv_handler = CaptureLogsHandler()
+
+    # Get the logger for 'dotenv' and attach the handler
+    dotenv_logger = logging.getLogger("dotenv")
+    dotenv_logger.addHandler(dotenv_handler)
+    dotenv_logger.setLevel(logging.WARNING)
+
+    # LOAD the files to check for parsing errors
+    for fp in [env_filepath, example_env_filepath]:
+        dotenv.dotenv_values(fp)
+        parsed_errors = [
+            msg
+            for msg in dotenv_handler.messages
+            if "could not parse statement starting" in msg
+        ]
+        if len(parsed_errors) > 0:
+            raise AssertionError(f"{fp} contains errors {parsed_errors}")
+
     # Check for duplicate keys
     check_duplicate_keys(env_filepath)
     check_duplicate_keys(example_env_filepath)
 
-    # Check for missing keys in either file
+    # Check for DIFFERENCES in keys between the two files
     current_env = dotenv.dotenv_values(env_filepath)
     example_env = dotenv.dotenv_values(example_env_filepath)
-
     current_keys = set(current_env.keys())
     example_keys = set(example_env.keys())
 
+    # Check for missing keys in either file
     # Check the symmetric difference; if it's nonempty, a key is missing in
     # one or the other of the files
     if len(current_keys ^ example_keys) > 0:
         raise AssertionError(
+            f"For .env {env_filepath}:\n"
             "Your .env file and .env.example files have different variables defined.  Please fix this; \n "
             f"in .env but not in .env.example we have: {sorted(current_keys.difference(example_keys))}\n"
             f"in .env.example but not in .env we have: {sorted(example_keys.difference(current_keys))}\n"
         )
+
+    # Check that all variables ending in _PATH or _DIRECTORY are valid paths
+    path_keys = [
+        k
+        for k in current_keys
+        if any(k.endswith(j) for j in ["_PATH", "_DIRECTORY", "_FILEPATH"])
+    ]
+    for current_key in path_keys:
+        k_prefix = f".env {env_filepath} has variable {current_key}"
+        current_path = current_env[current_key]
+        if current_path == "":
+            print(f"WARNING: {k_prefix} which is blank.")
+            continue
+        if not (os.path.isdir(current_path) or os.path.isfile(current_path)):
+            raise AssertionError(
+                f"For {k_prefix} with path {current_path} which is not a valid path on your machine."
+            )
 
 
 def get_env_bool(key):
