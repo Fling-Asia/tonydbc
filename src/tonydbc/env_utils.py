@@ -137,7 +137,8 @@ def check_environment_variable_integrity(env_filepath):
             print(f"WARNING: {k_prefix} which is blank.")
             continue
         if not (os.path.isdir(current_path) or os.path.isfile(current_path)):
-            raise AssertionError(
+            print(
+                "WARNING: "
                 f"For {k_prefix} with path {current_path} which is not a valid path on your machine."
             )
 
@@ -258,4 +259,3 @@ def load_dotenvs():
             # Check environment variables are consistent between .env and .env.example
             check_environment_variable_integrity(p)
     return paths
-

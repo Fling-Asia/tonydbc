@@ -10,6 +10,7 @@ To protect certain databases against accidental deletion, please set in your .en
 """
 import os
 import io
+import sys
 import code
 import json
 import pytz
@@ -50,11 +51,11 @@ def check_connection(fn):
             self._mariatonydbcn.ping()
         except mariadb.Error:
             _ping_str = "Ping failed: Restarting mariadb connection"
-            self._mariatonydbcn = mariadb.connect(self.connection_params)
             if self._l is None:
                 print(_ping_str)
             else:
                 self._l.info(_ping_str)
+            self.__enter__()
         result = fn(self, *args, **kwargs)
         return result
 
@@ -540,8 +541,8 @@ class __TonyDBCOnlineOnly:
 
         attempts_remaining = MAX_RECONNECTION_ATTEMPTS
         while attempts_remaining > 0:
-            try:
-                with self.cursor() as cursor:
+            with self.cursor() as cursor:
+                try:
                     # TODO: Consider adding
                     # cursor.execute("SET time_zone = '+00:00'")
                     # every time though???
@@ -555,21 +556,27 @@ class __TonyDBCOnlineOnly:
                         cursor.execute(command, command_values)
                     else:
                         cursor.execute(command)
-            except mariadb.InterfaceError as e:
-                # Try reconnecting by explicitly calling the TonyDBC enter method
-                # (not any child class overridden version) by doing this instead
-                # of saying self.__enter__()
-                self.log(
-                    f"Reconnecting to mariadb; attempting command {command} again. "
-                    f"Attempts remaining {attempts_remaining} BEFORE this attempt."
-                )
-                __TonyDBCOnlineOnly.__enter__(self)
-                attempts_remaining -= 1
-            except Exception as e:
-                self.log(f"mariadb execute command failed: {command} with error {e}")
-                code.interact(local=locals(), banner=f"{e}")
-            else:
-                break
+                except mariadb.InterfaceError as e:
+                    # Try reconnecting by explicitly calling the TonyDBC enter method
+                    # (not any child class overridden version) by doing this instead
+                    # of saying self.__enter__()
+                    self.log(
+                        f"Reconnecting to mariadb; attempting command {command} again. "
+                        f"Attempts remaining {attempts_remaining} BEFORE this attempt."
+                    )
+                    __TonyDBCOnlineOnly.__enter__(self)
+                    attempts_remaining -= 1
+                except Exception as e:
+                    self.log(
+                        f"mariadb execute command failed: {command} with error {e}"
+                    )
+                    code.interact(local=locals(), banner=f"{e}")
+                else:
+                    # if False and cursor.lastrowid is None:
+                    #    raise AssertionError(
+                    #        f"An error occurred with one of the commands {command}; lastrowid is None"
+                    #    )
+                    break
 
             # mariadb.InterfaceError: Lost connection to server during query
             # mariadb.OperationalError: Can't connect to server on 'fling.ninja' (10060)
@@ -914,7 +921,7 @@ class TonyDBC(__TonyDBCOnlineOnly):
                     self.__offline_pickle_path, self.__offline_pickle_path + ".BAK"
                 )
         except AttributeError as e:
-            code.interact(banner=f"tag1 {e}", local=locals())
+            code.interact(banner=f"Bad TonyDBC {e}", local=locals())
 
     def __enter__(self):
         super().__enter__()
