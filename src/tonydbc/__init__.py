@@ -25,7 +25,7 @@ e.g.
     tonydbc.load_dotenvs()
 
 """
-__version__ = "1.0.7"
+__version__ = "1.0.8"
 
 from .env_utils import get_env_bool, get_env_list, load_dotenv, load_dotenvs
 from .tony_utils import (
