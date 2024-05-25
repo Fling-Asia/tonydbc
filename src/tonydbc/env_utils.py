@@ -187,7 +187,7 @@ def get_env_list(key):
     except json.decoder.JSONDecodeError as e:
         raise Exception(
             "Expected environment variable to be a list. "
-            f' e.g. ["Zebra", "Camel"]. {e}'
+            f' e.g. ["Zebra", "Camel"], rather than: {os.environ[key]}.  {e}'
         )
 
     # Confirm it's a list of nonempty strings

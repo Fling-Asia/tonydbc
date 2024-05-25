@@ -89,6 +89,8 @@ class DataFrameFast(pd.DataFrame):
         if len(self) == 0:
             return
 
+        assert self.columns.is_unique, f"Dataframe columns are not unique:\n{df0}"
+
         # Drop columns which contain only NULL values since mariadb's stupid executemany might chokes on these
         # if they are in the final column
         # (note that this will screw things up if the column has a DEFAULT of something other than NULL)

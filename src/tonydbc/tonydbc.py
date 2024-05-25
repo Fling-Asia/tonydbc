@@ -326,7 +326,7 @@ class __TonyDBCOnlineOnly:
         try:
             ts = dateutil.parser.parse(iso_timestamp_string)
         except dateutil.parser._parser.ParserError as e:
-            raise ValueError(f"Timestamp '{iso_timestamp}' is invalid. {e}")
+            raise ValueError(f"Timestamp '{iso_timestamp_string}' is invalid. {e}")
         else:
             iso_ts = ts.astimezone(self.default_tz)  # dateutil.tz.UTC
             return iso_ts.strftime("%Y-%m-%d %H:%M:%S")
