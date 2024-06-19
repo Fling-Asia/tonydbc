@@ -112,7 +112,7 @@ class __TonyDBCOnlineOnly:
         # Used to preface all logging statements
         self.prefix = prefix
 
-        self.session_timezone = session_timezone
+        self.prelim_session_timezone = session_timezone
 
     def __enter__(self):
         self.log(f"Connecting to database {self.database}.")
@@ -164,7 +164,7 @@ class __TonyDBCOnlineOnly:
             raise AssertionError("Database could not open via mariadb")
 
         # Set the timezone for the first time
-        self.set_timezone(self.session_timezone)
+        self.set_timezone(self.prelim_session_timezone)
 
     def set_timezone(self, session_timezone=None):
         """
@@ -175,6 +175,9 @@ class __TonyDBCOnlineOnly:
         """
         if session_timezone is None:
             self.session_timezone = os.environ["DEFAULT_TIMEZONE"]
+        elif session_timezone == self.session_timezone:
+            self.log(f"Time zone unchanged ({self.session_timezone})")
+            return
         else:
             self.session_timezone = session_timezone
 
