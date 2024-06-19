@@ -86,6 +86,7 @@ class __TonyDBCOnlineOnly:
         l=None,
         prefix="",
         lost_connection_callback=None,
+        session_timezone=None,
     ):
         """
         Parameters:
@@ -110,6 +111,8 @@ class __TonyDBCOnlineOnly:
 
         # Used to preface all logging statements
         self.prefix = prefix
+
+        self.session_timezone = session_timezone
 
     def __enter__(self):
         self.log(f"Connecting to database {self.database}.")
@@ -160,14 +163,25 @@ class __TonyDBCOnlineOnly:
 
             raise AssertionError("Database could not open via mariadb")
 
-        # Set the IANA session time zone for display and input purposes for TIMEZONE fields
-        # e.g. "Asia/Bangkok"
-        self.session_timezone = os.environ["DEFAULT_TIMEZONE"]
+        # Set the timezone for the first time
+        self.set_timezone(self.session_timezone)
+
+    def set_timezone(self, session_timezone=None):
+        """
+        Set the IANA session time zone for display and input purposes for TIMEZONE fields
+        e.g. session_timezone = "Asia/Bangkok" => session_time_offset = "+07:00"
+
+        if None specified, default to os.environ["DEFAULT_TIMEZONE"]
+        """
+        if session_timezone is None:
+            self.session_timezone = os.environ["DEFAULT_TIMEZONE"]
+        else:
+            self.session_timezone = session_timezone
 
         if not self.session_timezone in zoneinfo.available_timezones():
             raise AssertionError(
-                "The session timezone given in DEFAULT_TIMEZONE environment variable, "
-                f"{os.environ['DEFAULT_TIMEZONE']}, is not a valid IANA time zone (for a complete list,"
+                f"The session timezone specified, {self.session_timezone}, "
+                "is not a valid IANA time zone (for a complete list,"
                 " see zoneinfo.available_timezones())."
             )
 
@@ -175,21 +189,16 @@ class __TonyDBCOnlineOnly:
         system_timezone = str(tzlocal.get_localzone())
 
         if self.session_timezone != system_timezone:
-            raise AssertionError(
-                "The session timezone given in DEFAULT_TIMEZONE environment variable, "
-                f"{os.environ['DEFAULT_TIMEZONE']}, is not the same as the system time "
-                f"zone {system_timezone}.  It MUST be the same to avoid time issues."
+            self.log(
+                f"WARNING: The session timezone specified, {self.session_timezone}, "
+                f", is not the same as the system time "
+                f"zone {system_timezone}.  This might be fine if you are rendering data for another time zone, "
+                "but it WILL cause problems if you are APPENDING or INSERTING data if you are not careful."
             )
 
-        self.session_time_offset = os.environ["DEFAULT_TIME_OFFSET"]  # e.g. "+07:00"
-        # No need to store both these values in .env, but for now we do; let's make sure
-        # that they are consistent  # e.g. "+07:00"
-        if get_tz_offset(iana_tz=self.session_timezone) != self.session_time_offset:
-            raise AssertionError(
-                "Somehow the session_timezone does not agree with session_time_offset: "
-                f"get_tz_offset(session_timezone) is {get_tz_offset(self.session_timezone)} and "
-                f"session_time_offset is {self.session_time_offset}."
-            )
+        self.session_time_offset = get_tz_offset(
+            iana_tz=self.session_timezone
+        )  # e.g. "+07:00"
 
         # Set the database session to be this time zone
         # any INSERT or UPDATE commands executed on TIMEZONE data types will assume
@@ -197,6 +206,11 @@ class __TonyDBCOnlineOnly:
         self.execute(f"SET @@session.time_zone:='{self.session_time_offset}';")
         self.default_tz = dateutil.tz.gettz(self.session_timezone)
         assert self.default_tz is not None
+
+        self.log(
+            f"TonyDBC: @@session.time_zone set to {self.session_time_offset}, "
+            f"which is IANA timezone {self.session_timezone}."
+        )
 
         return self
 
