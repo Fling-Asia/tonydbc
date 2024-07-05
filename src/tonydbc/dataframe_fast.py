@@ -11,11 +11,13 @@ NOTE: Works only with mariadb's connector for now (pip3 install mariadb)
     https://mariadb.com/resources/blog/how-to-connect-python-programs-to-mariadb/
 
 """
+
 import code
 import numpy as np
 import pandas as pd
 import warnings
 import mariadb
+from env_utils import get_env_bool
 
 # Map SQL types to Python datatypes
 DATATYPE_MAP = {
@@ -173,7 +175,10 @@ class DataFrameFast(pd.DataFrame):
                 for sublist in table_data
             ]
         except ValueError as e:
-            code.interact(local=locals(), banner="tupling no workie")
+            if get_env_bool("INTERACT_AFTER_ERROR"):
+                code.interact(local=locals(), banner="tupling no workie")
+            else:
+                raise ValueError(e)
 
         # Optimization: just use `execute` if it's a single line of data
         if len(table_data) == 1:

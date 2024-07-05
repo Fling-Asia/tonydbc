@@ -11,6 +11,7 @@ Support utilities for TonyDBC:
     validate_tz_offset
 
 """
+
 import os
 import code
 import json
@@ -106,8 +107,11 @@ def deserialize_table(
         try:
             cur_df.loc[:, [c]] = cur_df.loc[:, [c]].fillna("nan")
         except KeyError as e:
-            print(f"KEY ERROR {e}")
-            code.interact(local=locals(), banner=f"{e}")
+            if get_env_bool("INTERACT_AFTER_ERROR"):
+                print(f"KEY ERROR {e}")
+                code.interact(local=locals(), banner=f"{e}")
+            else:
+                raise KeyError(e)
 
         try:
             cur_df.loc[:, [c]] = cur_df.loc[:, [c]].apply(
@@ -115,11 +119,17 @@ def deserialize_table(
                 axis=1,
             )
         except TypeError as e:
-            print(f"tonydbc.deserialize_table ERROR {e}")
-            code.interact(local=locals(), banner=f"{e}")
+            if get_env_bool("INTERACT_AFTER_ERROR"):
+                print(f"tonydbc.deserialize_table ERROR {e}")
+                code.interact(local=locals(), banner=f"{e}")
+            else:
+                raise TypeError(e)
         except json.decoder.JSONDecodeError as e:
-            print(f"tonydbc.deserialize_table ERROR {e}")
-            code.interact(local=locals(), banner=f"{e}")
+            if get_env_bool("INTERACT_AFTER_ERROR"):
+                print(f"tonydbc.deserialize_table ERROR {e}")
+                code.interact(local=locals(), banner=f"{e}")
+            else:
+                raise json.decoder.JSONDecodeError(e)
 
     # CONVERT all pd.Timestamp objects (which have been provided by mariadb
     # in the session timezone anyway)
