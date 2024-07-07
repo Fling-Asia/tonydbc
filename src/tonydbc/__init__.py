@@ -15,6 +15,7 @@ Note: you should define the following environment variables before using this li
     PRODUCTION_DATABASES        = ["master_db", "master2_db", "etc"]
     MYSQL_TEST_DATABASE         = test_db
     MYSQL_PRODUCTION_DATABASE   = master_db
+    INTERACT_AFTER_ERROR        = False
     # Full list is at pytz.all_timezones
     DEFAULT_TIMEZONE            = Asia/Singapore  
     DEFAULT_TIME_OFFSET         = +08:00
@@ -25,6 +26,7 @@ e.g.
     tonydbc.load_dotenvs()
 
 """
+
 __version__ = "1.0.10"
 
 from .env_utils import get_env_bool, get_env_list, load_dotenv, load_dotenvs

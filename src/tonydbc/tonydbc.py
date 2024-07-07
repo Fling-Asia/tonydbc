@@ -8,6 +8,7 @@ To protect certain databases against accidental deletion, please set in your .en
     PRODUCTION_DATABASES = ["important_db", "other_important_db"]
 
 """
+
 import os
 import io
 import sys
@@ -37,7 +38,7 @@ from .tony_utils import (
     get_current_time_string,
     get_tz_offset,
 )
-from .env_utils import get_env_list
+from .env_utils import get_env_list, get_env_bool
 
 NULL = mariadb.constants.INDICATOR.NULL
 
@@ -584,10 +585,13 @@ class __TonyDBCOnlineOnly:
                     __TonyDBCOnlineOnly.__enter__(self)
                     attempts_remaining -= 1
                 except Exception as e:
-                    self.log(
-                        f"mariadb execute command failed: {command} with error {e}"
-                    )
-                    code.interact(local=locals(), banner=f"{e}")
+                    if get_env_bool("INTERACT_AFTER_ERROR"):
+                        self.log(
+                            f"mariadb execute command failed: {command} with error {e}"
+                        )
+                        code.interact(local=locals(), banner=f"{e}")
+                    else:
+                        raise Exception(e)
                 else:
                     # if False and cursor.lastrowid is None:
                     #    raise AssertionError(
@@ -621,7 +625,7 @@ class __TonyDBCOnlineOnly:
                 f"\nScript to run: {script_path}"
             )
             # Wait for user command
-            code.interact(local=locals(), banner=f"{e}")
+            code.interact(local=locals(), banner="Run script manually please")
 
             if get_return_values:
                 return []
@@ -938,7 +942,10 @@ class TonyDBC(__TonyDBCOnlineOnly):
                     self.__offline_pickle_path, self.__offline_pickle_path + ".BAK"
                 )
         except AttributeError as e:
-            code.interact(banner=f"Bad TonyDBC {e}", local=locals())
+            if get_env_bool("INTERACT_AFTER_ERROR"):
+                code.interact(banner=f"Bad TonyDBC {e}", local=locals())
+            else:
+                raise AttributeError(e)
 
     def __enter__(self):
         super().__enter__()
