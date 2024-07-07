@@ -625,7 +625,7 @@ class __TonyDBCOnlineOnly:
                 f"\nScript to run: {script_path}"
             )
             # Wait for user command
-            code.interact(local=locals())
+            code.interact(local=locals(), banner="Run script manually please")
 
             if get_return_values:
                 return []
