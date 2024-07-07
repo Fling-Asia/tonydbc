@@ -18,7 +18,6 @@ Note: you should define the following environment variables before using this li
     INTERACT_AFTER_ERROR        = False
     # Full list is at pytz.all_timezones
     DEFAULT_TIMEZONE            = Asia/Singapore  
-    DEFAULT_TIME_OFFSET         = +08:00
     MEDIA_BASE_PATH_PRODUCTION  = C:\\
 
 e.g. 
