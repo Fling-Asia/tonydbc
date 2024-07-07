@@ -328,9 +328,9 @@ class __TonyDBCOnlineOnly:
 
     def iso_timestamp_to_session_time_zone(self, iso_timestamp_string):
         """e.g. converts an ISO-formatted string to the database session's time zone,
-        self.DEFAULT_TIME_OFFSET, which is useful when adding to a mariadb TIMESTAMP
+        self.default_tz, which is useful when adding to a mariadb TIMESTAMP
         which assumes the time is formatted as the session time zone.
-        e.g. self.DEFAULT_TIME_OFFSET = "+07:00",
+        e.g. self.default_tz = "Asia/Bangkok",
             "2023-03-03T09:00:00+07:00" ->
             "2023-03-03 09:00:00"
                 (since 9-7+7 = 9)
