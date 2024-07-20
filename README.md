@@ -24,10 +24,17 @@ TonyDBC uses the MariaDB/Connector but adds these features:
 
 ### Installation
 
-To install TonyDBC from PyPI:
+To install TonyDBC from PyPI on Windows:
 
-```python
+```bash
 pip install tonydbc
+```
+
+To install TonyDBC on Ubuntu or Debian, first the MariaDB Connector / Python must be installed via `apt-get`, because it cannot be installed via `pip3`:
+
+```bash
+sudo apt-get install -y libmariadb3 libmariadb-dev
+pip3 install tonydbc
 ```
 
 ### Usage
@@ -36,6 +43,7 @@ A typical use case:
 
 ```python
 from tonydbc import TonyDBC, load_dotenvs
+import pandas as pd
 
 load_dotenvs()
 
@@ -49,5 +57,13 @@ sql_params = {
 
 with TonyDBC(**sql_params) as db:
     # Do stuff
-    pass
+    contoso_users_df = db.query_table("user", f"""
+        SELECT *
+        FROM `user`
+        WHERE
+            `user`.`company` = 'Contoso'
+        LIMIT 10;
+        """)
+
+    print(contoso_users_df.first_name)
 ```

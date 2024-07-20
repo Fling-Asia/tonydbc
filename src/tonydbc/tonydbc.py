@@ -40,8 +40,6 @@ from .tony_utils import (
 )
 from .env_utils import get_env_list, get_env_bool
 
-NULL = mariadb.constants.INDICATOR.NULL
-
 # Max number of times to re-try a command if connection is lost
 MAX_RECONNECTION_ATTEMPTS = 3
 

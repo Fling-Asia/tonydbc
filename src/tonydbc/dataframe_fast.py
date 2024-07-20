@@ -168,10 +168,10 @@ class DataFrameFast(pd.DataFrame):
 
         # "1. Special values like None or column default value needs to
         #     be indicated by an indicator."
-        NULL = mariadb.constants.INDICATOR.NULL
+        MARIADB_NULL = mariadb.constants.INDICATOR.NULL
         try:
             table_data = [
-                tuple([NULL if pd.isna(value) else value for value in sublist])
+                tuple([MARIADB_NULL if pd.isna(value) else value for value in sublist])
                 for sublist in table_data
             ]
         except ValueError as e:
@@ -187,8 +187,8 @@ class DataFrameFast(pd.DataFrame):
             return
 
         # 2. A workaround to https://jira.mariadb.org/browse/CONPY-254
-        table_data_bad = [v for i, v in enumerate(table_data) if v[-1] == NULL]
-        table_data_good = [v for i, v in enumerate(table_data) if v[-1] != NULL]
+        table_data_bad = [v for i, v in enumerate(table_data) if v[-1] == MARIADB_NULL]
+        table_data_good = [v for i, v in enumerate(table_data) if v[-1] != MARIADB_NULL]
 
         with con.cursor() as cursor:
             # Try to use the bulk (faster) option for the "good" rows
