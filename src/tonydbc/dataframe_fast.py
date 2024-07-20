@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import warnings
 import mariadb
-from env_utils import get_env_bool
+from .env_utils import get_env_bool
 
 # Map SQL types to Python datatypes
 DATATYPE_MAP = {

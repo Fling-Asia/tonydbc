@@ -186,8 +186,10 @@ def get_env_list(key):
         v_list = json.loads(v)
     except json.decoder.JSONDecodeError as e:
         raise Exception(
-            "Expected environment variable to be a list, and for all Windows paths to be escaped e.g. \\ instead of \ "
-            f' e.g. ["C:\\Zebra\\.env", "Camel\\other.env"], rather than: {os.environ[key]}.  {e}'
+            "Expected environment variable to be a list, and for all Windows "
+            "paths to be escaped e.g. \\\\ instead of a single \\ ; "
+            f'e.g. ["C:\\\\Zebra\\\\.env", "Camel\\\\other.env"], '
+            f"rather than: {os.environ[key]}.  {e}"
         )
 
     # Confirm it's a list of nonempty strings
