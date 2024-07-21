@@ -30,10 +30,20 @@ To install TonyDBC from PyPI on Windows:
 pip install tonydbc
 ```
 
-To install TonyDBC on Ubuntu or Debian, first the MariaDB Connector / Python must be installed via `apt-get`, because it cannot be installed via `pip3`:
+To install TonyDBC on Ubuntu or Debian, first the MariaDB Connector / C must be installed, then the MariaDB Connector / Python must be installed, because neither can be installed via `pip3`:
 
 ```bash
+cd ~
+
+sudo apt-get install -y wget curl python3-packaging gcc
+
+# Install mariadb CS Package Repository so apt-get can find the right package
+# See https://mariadb.com/docs/skysql/connect/programming-languages/c/install/#Installation_via_Package_Repository_(Linux)
+wget https://r.mariadb.com/downloads/mariadb_repo_setup
+chmod +x mariadb_repo_setup
+sudo ./mariadb_repo_setup  --mariadb-server-version="mariadb-11.1.5"
 sudo apt-get install -y libmariadb3 libmariadb-dev
+
 pip3 install tonydbc
 ```
 
