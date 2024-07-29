@@ -193,7 +193,7 @@ class __TonyDBCOnlineOnly:
         if self.session_timezone != system_timezone:
             self.log(
                 f"WARNING: The session timezone specified, {self.session_timezone}, "
-                f", is not the same as the system time "
+                f"is not the same as the system time "
                 f"zone {system_timezone}.  This might be fine if you are rendering data for another time zone, "
                 "but it WILL cause problems if you are APPENDING or INSERTING data if you are not careful."
             )
