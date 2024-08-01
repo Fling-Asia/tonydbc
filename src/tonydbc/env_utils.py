@@ -231,13 +231,14 @@ def load_dotenvs():
             print(f"WARNING: No `DOT_ENVS` present.")
             return
     else:
+        print(f"LOADING {base_env_path}")
         load_dotenv(base_env_path)
 
     if "DOT_ENVS" in os.environ:
         # Get every .env we are supposed to load
-        paths = get_env_list("DOT_ENVS")
+        env_paths_raw = get_env_list("DOT_ENVS")
     else:
-        paths = [base_env_path]
+        env_paths_raw = [base_env_path]
 
     # In some contexts, like docker on the server, it's impractical
     # to check environment integrity so let's do it only optionally
@@ -245,19 +246,22 @@ def load_dotenvs():
     do_check = cs in os.environ and get_env_bool(cs)
 
     # Prepend the script's path if the provided env path is relative
-    paths = [p if os.path.isabs(p) else os.path.join(sys.path[0], p) for p in paths]
+    env_paths = [
+        p if os.path.isabs(p) else os.path.join(sys.path[0], p) for p in env_paths_raw
+    ]
 
     # Resolve the path to remove any pesky ".."s
-    paths = [str(pathlib.Path(p).resolve()) for p in paths]
+    env_paths = [str(pathlib.Path(p).resolve()) for p in env_paths]
 
     # Load and check these files against their .env.example files for omissions
-    for p in paths:
-        if not os.path.isfile(p):
-            print(f"WARNING: env path {p} does not exist")
+    for env_path in env_paths:
+        if not os.path.isfile(env_path):
+            print(f"WARNING: env path {env_path} does not exist")
             continue
-        dotenv.load_dotenv(p)
+        print(f"LOADING {env_path}")
+        dotenv.load_dotenv(env_path)
         if do_check:
-            print(f"Checking environment integrity on {p}")
+            print(f"Checking environment integrity on {env_path}")
             # Check environment variables are consistent between .env and .env.example
-            check_environment_variable_integrity(p)
-    return paths
+            check_environment_variable_integrity(env_path)
+    return env_paths
