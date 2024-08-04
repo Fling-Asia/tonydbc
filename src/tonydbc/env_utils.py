@@ -133,6 +133,8 @@ def check_environment_variable_integrity(env_filepath):
     for current_key in path_keys:
         k_prefix = f".env {env_filepath} has variable {current_key}"
         current_path = current_env[current_key]
+        continue
+        # These warnings are very verbose and annoying, so we'll skip them
         if current_path == "":
             print(f"WARNING: {k_prefix} which is blank.")
             continue
