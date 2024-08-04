@@ -38,7 +38,7 @@ from .tony_utils import (
     get_current_time_string,
     get_tz_offset,
 )
-from .env_utils import get_env_list, get_env_bool
+from .env_utils import get_env_list
 
 # Max number of times to re-try a command if connection is lost
 MAX_RECONNECTION_ATTEMPTS = 3
@@ -86,6 +86,7 @@ class __TonyDBCOnlineOnly:
         prefix="",
         lost_connection_callback=None,
         session_timezone=None,
+        interact_after_error=False,
     ):
         """
         Parameters:
@@ -107,6 +108,7 @@ class __TonyDBCOnlineOnly:
         self._l = l
         self._lost_connection_callback = lost_connection_callback
         self.using_temp_conn = False
+        self.interact_after_error = interact_after_error
 
         # Used to preface all logging statements
         self.prefix = prefix
@@ -584,7 +586,7 @@ class __TonyDBCOnlineOnly:
                     __TonyDBCOnlineOnly.__enter__(self)
                     attempts_remaining -= 1
                 except Exception as e:
-                    if get_env_bool("INTERACT_AFTER_ERROR"):
+                    if self.interact_after_error:
                         self.log(
                             f"mariadb execute command failed: {command} with error {e}"
                         )
@@ -953,7 +955,7 @@ class TonyDBC(__TonyDBCOnlineOnly):
                     self.__offline_pickle_path, self.__offline_pickle_path + ".BAK"
                 )
         except AttributeError as e:
-            if get_env_bool("INTERACT_AFTER_ERROR"):
+            if self.interact_after_error:
                 code.interact(banner=f"Bad TonyDBC {e}", local=locals())
             else:
                 raise AttributeError(e)
