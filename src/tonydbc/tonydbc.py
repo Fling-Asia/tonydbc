@@ -128,6 +128,7 @@ class __TonyDBCOnlineOnly:
                 # connect_timeout=30,  # Default is 0, in seconds (have not yet tried this)
                 read_timeout=3600,  # 15,  # in seconds
                 write_timeout=3600,  # 20  # in seconds
+                local_infile=True,
             )
         except mariadb.InterfaceError as e:
             raise Exception(
@@ -596,6 +597,13 @@ class __TonyDBCOnlineOnly:
                     #        f"An error occurred with one of the commands {command}; lastrowid is None"
                     #    )
                     break
+                cursor.execute("SHOW WARNINGS;")
+                # Check for warnings
+                warnings = cursor.fetchall()
+
+            if warnings:
+                for warning in warnings:
+                    print(warning)
 
             # mariadb.InterfaceError: Lost connection to server during query
             # mariadb.OperationalError: Can't connect to server on 'fling.ninja' (10060)
@@ -783,8 +791,13 @@ class __TonyDBCOnlineOnly:
 
         df_serialized = serialize_table(df, col_dtypes, columns_to_serialize)
 
+        # Calculate memory used as a nice message for the user
+        memory_used_mb = df_serialized.memory_usage(deep=True).sum() / (1024**2)
+
         # Append our values to the actual database table
-        self.log(f"INSERT {len(df_serialized)} rows in {self.database}.{table}")
+        self.log(
+            f"INSERT {len(df_serialized)} rows in {self.database}.{table} ({memory_used_mb:.2f} MB)"
+        )
         self.write_dataframe(df_serialized, table, if_exists="append", index=False)
 
         # Return the dataframe with the actual index AUTOINCREMENTED with the correct numbers

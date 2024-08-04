@@ -12,7 +12,10 @@ NOTE: Works only with mariadb's connector for now (pip3 install mariadb)
 
 """
 
+import os
 import code
+import tempfile
+import csv
 import numpy as np
 import pandas as pd
 import warnings
@@ -68,6 +71,11 @@ FIELD_TYPE = mariadb.constants.FIELD_TYPE
 FIELD_TYPE_DICT = {
     getattr(FIELD_TYPE, k): k for k in dir(FIELD_TYPE) if not k.startswith("_")
 }
+
+# To handle as many strings as possible without any issues, let's use some very obscure characters to delimit the CSV
+FIELD_DELIMITER = "\x1F"  # Unit Separator (␟)
+ENCLOSURE_CHAR = "\x1E"  # Record Separator (␞)
+LINE_TERMINATOR = "\n"  # Keep newline as is since the record separator is enough.
 
 
 class DataFrameFast(pd.DataFrame):
@@ -157,64 +165,127 @@ class DataFrameFast(pd.DataFrame):
             f" VALUES ({', '.join(['?']*len(cols))})"
         )
 
-        table_data = list(df0.itertuples(index=index))
+        # Double-check that our dataframe does not contain our special csv control characters
+        def has_ctrl_chars(s):
+            if isinstance(s, str):
+                return ENCLOSURE_CHAR in s or FIELD_DELIMITER in s
+            return False
 
-        if len(table_data) == 0:
+        df_has_ctrl_chars = df0.map(has_ctrl_chars).values.any()
+
+        if len(df0) == 0:
             # Nothing to INSERT
             return
+        elif len(df0) > 3 and not df_has_ctrl_chars:
+            temp_dir = tempfile.TemporaryDirectory()
+            tmp_filepath = os.path.join(temp_dir.name, name + ".csv")
 
-        # https://mariadb-corporation.github.io/mariadb-connector-python/usage.html
-        # "When using executemany(), there are a few restrictions:"
+            # Convert to csv for uploading to the server as a file, which is faster
+            # for some reason
+            # the fillna is to handle NULLs
+            df0.fillna("\\N").to_csv(
+                tmp_filepath,
+                index=False,
+                header=True,
+                quotechar=ENCLOSURE_CHAR,
+                quoting=csv.QUOTE_ALL,
+                sep=FIELD_DELIMITER,
+                lineterminator=LINE_TERMINATOR,
+            )
 
-        # "1. Special values like None or column default value needs to
-        #     be indicated by an indicator."
-        MARIADB_NULL = mariadb.constants.INDICATOR.NULL
-        try:
-            table_data = [
-                tuple([MARIADB_NULL if pd.isna(value) else value for value in sublist])
-                for sublist in table_data
-            ]
-        except ValueError as e:
-            if get_env_bool("INTERACT_AFTER_ERROR"):
-                code.interact(local=locals(), banner="tupling no workie")
-            else:
-                raise ValueError(e)
+            # Use the faster INFILE method for larger sets of data
+            # Set the path to save the CSV file
+            tmp_filepath = tmp_filepath.replace("\\", "\\\\")
 
-        # Optimization: just use `execute` if it's a single line of data
-        if len(table_data) == 1:
+            # Write DataFrame to a CSV file with specified delimiters and text qualifiers
+            cmd = f"""
+                LOAD DATA LOCAL INFILE %s 
+                    INTO TABLE `{name}`
+                    FIELDS TERMINATED BY %s 
+                    ENCLOSED BY %s
+                    LINES TERMINATED BY %s
+                    IGNORE 1 ROWS
+                    ({', '.join(cols)});
+                """
+
             with con.cursor() as cursor:
-                cursor.execute(cmd, table_data[0])
-            return
+                cursor.execute(
+                    cmd,
+                    (tmp_filepath, FIELD_DELIMITER, ENCLOSURE_CHAR, LINE_TERMINATOR),
+                )
+                cursor.execute("SHOW WARNINGS;")
+                # Check for warnings
+                warnings = cursor.fetchall()
 
-        # 2. A workaround to https://jira.mariadb.org/browse/CONPY-254
-        table_data_bad = [v for i, v in enumerate(table_data) if v[-1] == MARIADB_NULL]
-        table_data_good = [v for i, v in enumerate(table_data) if v[-1] != MARIADB_NULL]
+            if warnings:
+                print(f"TonyDBC ran the command:\n{cmd}\nWARNINGS:\n")
+                for warning in warnings:
+                    print(warning)  # Each warning is a tuple (Level, Code, Message)
 
-        with con.cursor() as cursor:
-            # Try to use the bulk (faster) option for the "good" rows
-            if len(table_data_good) > 0:
-                try:
-                    cursor.executemany(cmd, table_data_good)
-                except mariadb.ProgrammingError as e:
-                    print(
-                        f"Warning: problem with executemany; probably because you are using a "
-                        f"np.dtypes.Int64DType data type.  We'll just insert these one at a time. {e}"
+            temp_dir.cleanup()
+
+        else:
+            # For a small amount of data, I guess we can use the old way
+            table_data = list(df0.itertuples(index=index))
+
+            # https://mariadb-corporation.github.io/mariadb-connector-python/usage.html
+            # "When using executemany(), there are a few restrictions:"
+
+            # "1. Special values like None or column default value needs to
+            #     be indicated by an indicator."
+            MARIADB_NULL = mariadb.constants.INDICATOR.NULL
+            try:
+                table_data = [
+                    tuple(
+                        [MARIADB_NULL if pd.isna(value) else value for value in sublist]
                     )
-                    for v in table_data_good:
-                        cursor.execute(cmd, v)
-                except SystemError as e:
-                    # 3. "All tuples must have the same types as in first tuple.
-                    #    E.g. the parameter [(1),(1.0)] or [(1),(None)] are invalid."
-                    print(
-                        "Warning: due to a known bug in a mariadb connector, e.g. None in final field or something, "
-                        f"`executemany` raises {e}.  Failing over to row-by-row `execute`"
-                    )
-                    for v in table_data_good:
-                        cursor.execute(cmd, v)
+                    for sublist in table_data
+                ]
+            except ValueError as e:
+                if get_env_bool("INTERACT_AFTER_ERROR"):
+                    code.interact(local=locals(), banner="tupling no workie")
+                else:
+                    raise ValueError(e)
 
-            if len(table_data_bad) > 0:
-                for v in table_data_bad:
-                    cursor.execute(cmd, v)
+            # Optimization: just use `execute` if it's a single line of data
+            if len(table_data) == 1:
+                with con.cursor() as cursor:
+                    cursor.execute(cmd, table_data[0])
+                return
+
+            # 2. A workaround to https://jira.mariadb.org/browse/CONPY-254
+            table_data_bad = [
+                v for i, v in enumerate(table_data) if v[-1] == MARIADB_NULL
+            ]
+            table_data_good = [
+                v for i, v in enumerate(table_data) if v[-1] != MARIADB_NULL
+            ]
+
+            with con.cursor() as cursor:
+                # Try to use the bulk (faster) option for the "good" rows
+                if len(table_data_good) > 0:
+                    try:
+                        cursor.executemany(cmd, table_data_good)
+                    except mariadb.ProgrammingError as e:
+                        print(
+                            f"Warning: problem with executemany; probably because you are using a "
+                            f"np.dtypes.Int64DType data type.  We'll just insert these one at a time. {e}"
+                        )
+                        for v in table_data_good:
+                            cursor.execute(cmd, v)
+                    except SystemError as e:
+                        # 3. "All tuples must have the same types as in first tuple.
+                        #    E.g. the parameter [(1),(1.0)] or [(1),(None)] are invalid."
+                        print(
+                            "Warning: due to a known bug in a mariadb connector, e.g. None in final field or something, "
+                            f"`executemany` raises {e}.  Failing over to row-by-row `execute`"
+                        )
+                        for v in table_data_good:
+                            cursor.execute(cmd, v)
+
+                if len(table_data_bad) > 0:
+                    for v in table_data_bad:
+                        cursor.execute(cmd, v)
 
     def column_info(self):
         """Returns the column information.
