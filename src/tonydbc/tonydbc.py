@@ -114,7 +114,7 @@ class __TonyDBCOnlineOnly:
         self.prelim_session_timezone = session_timezone
 
     def __enter__(self):
-        self.log(f"Connecting to database {self.database}.")
+        self.log(f"Connecting to database {self.database} on {self.host}.")
         try:
             # DOCS:
             # https://github.com/mariadb-corporation/mariadb-connector-python/blob/f26934540d9506b6079ad92f603b697c761622de/mariadb/mariatonydbcnection.c#L301

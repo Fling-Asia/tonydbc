@@ -230,7 +230,7 @@ def load_dotenvs():
 
         # Last resort: try seeing if it's just already there in os.environ anyway
         if not "DOT_ENVS" in os.environ:
-            print(f"WARNING: No `DOT_ENVS` present.")
+            print(f"WARNING: No BASE ENV `DOT_ENVS` present.")
             return
     else:
         print(f"LOADING BASE ENV {base_env_path}")
@@ -260,10 +260,10 @@ def load_dotenvs():
         if not os.path.isfile(env_path):
             print(f"WARNING: env path {env_path} does not exist")
             continue
-        print(f"LOADING {env_path}")
+        print(f"LOADING  {env_path}")
         dotenv.load_dotenv(env_path, override=True)
         if do_check:
-            print(f"Checking environment integrity on {env_path}")
+            print(f"CHECKING {env_path}")
             # Check environment variables are consistent between .env and .env.example
             check_environment_variable_integrity(env_path)
     return env_paths
