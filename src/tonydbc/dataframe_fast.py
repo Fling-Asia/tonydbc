@@ -106,7 +106,7 @@ class DataFrameFast(pd.DataFrame):
         # (note that this will screw things up if the column has a DEFAULT of something other than NULL)
         cols_with_all_NULLs = self.columns[pd.isna(self).all()]
 
-        df0 = self.drop(columns=cols_with_all_NULLs)
+        df0 = self.drop(columns=cols_with_all_NULLs).copy()
 
         # Find any datetime columns.  e.g. dt_cols = {'file_created_at': datetime64[ns, Asia/Bangkok]}
         dt_cols = {
@@ -179,6 +179,12 @@ class DataFrameFast(pd.DataFrame):
         elif len(df0) > 3 and not df_has_ctrl_chars:
             temp_dir = tempfile.TemporaryDirectory()
             tmp_filepath = os.path.join(temp_dir.name, name + ".csv")
+
+            # Identify boolean columns and convert them to int (1 for True, 0 for False)
+            # to avoid the warning: ('Warning', 1366, "Incorrect integer value:
+            # 'False' for column michael_db.cats.is_success at row 1")
+            bool_cols = df0.select_dtypes(include=["bool"]).columns
+            df0[bool_cols] = df0[bool_cols].astype(int)
 
             # Convert to csv for uploading to the server as a file, which is faster
             # for some reason
