@@ -16,6 +16,7 @@ Note: you should define the following environment variables before using this li
     MYSQL_TEST_DATABASE         = test_db
     MYSQL_PRODUCTION_DATABASE   = master_db
     INTERACT_AFTER_ERROR        = False
+    AUDIT_PATH                  = database
     # Full list is at pytz.all_timezones
     DEFAULT_TIMEZONE            = Asia/Singapore  
     MEDIA_BASE_PATH_PRODUCTION  = C:\\

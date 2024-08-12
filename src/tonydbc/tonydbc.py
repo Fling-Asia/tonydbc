@@ -7,6 +7,35 @@ To protect certain databases against accidental deletion, please set in your .en
 
     PRODUCTION_DATABASES = ["important_db", "other_important_db"]
 
+To instrument TonyDBC to diagnose performance:
+
+     simply populate the following in .env:
+
+        INSTRUMENTATION_PATH = C:\\tony_log.csv
+
+    or to populate ONLY the database table `tony`:
+
+        INSTRUMENTATION_PATH = database
+
+    or to disable performance logging:
+
+        INSTRUMENTATION_PATH =
+
+DOCUMENTATION
+
+The common core methods of TonyDBC:
+
+    append_to_table: INSERT; returns DataFrame (optionally)
+        table, df, return_reindexed=False
+    query_table:     SELECT; returns a DataFrame
+        table, query=None
+    execute:         does not return any data
+        command, command_values=None, before_retry_cmd=None
+    get_data:        SELECT; returns a list of dicts.
+        query
+    update_blob:     UPDATE
+        table_name, blob_column, id_value, filepath, max_size_MB=16
+
 """
 
 import os
@@ -16,6 +45,7 @@ import code
 import json
 import pytz
 import zoneinfo
+import inspect
 import tzlocal
 import typing
 import pickle
@@ -27,6 +57,8 @@ import copy
 import shutil
 import pathlib
 import queue
+import filelock
+import uuid6
 
 # Use the official mariadb Python connection library
 import mariadb
@@ -37,8 +69,12 @@ from .tony_utils import (
     deserialize_table,
     get_current_time_string,
     get_tz_offset,
+    get_payload_info,
+    get_next_word_after_from,
 )
 from .env_utils import get_env_list
+from .tony_utils import prepare_scripts
+
 
 # Max number of times to re-try a command if connection is lost
 MAX_RECONNECTION_ATTEMPTS = 3
@@ -98,6 +134,8 @@ class __TonyDBCOnlineOnly:
         if any(k is None or (type(k) == str and k == "") for k in required_fields):
             raise AssertionError("TonyDBC: Not all credentials provided.")
 
+        # uuid will be set when the connection is made
+        self.session_uuid = str(uuid6.uuid8())
         self.host = host
         self.database = database
         self.user = user
@@ -114,6 +152,22 @@ class __TonyDBCOnlineOnly:
         self.prefix = prefix
 
         self.prelim_session_timezone = session_timezone
+
+        self.do_audit = False
+
+        # For debugging purposes, we may wish to instrument all queries
+        if "INSTRUMENTATION_PATH" in os.environ:
+            ipath = os.environ["INSTRUMENTATION_PATH"]
+            if ipath == "database":
+                # Track only on the database, not locally
+                self.do_audit = True
+                self.ipath = ipath
+            elif ipath != "":
+                self.do_audit = True
+                self.ipath = pathlib.Path(ipath).resolve()
+                # Delete the instrumentation csv file if it has zero size
+                if self.ipath.exists() and self.ipath.stat().st_size == 0:
+                    self.ipath.unlink()
 
     def __enter__(self):
         self.log(f"Connecting to database {self.database} on {self.host}.")
@@ -168,6 +222,19 @@ class __TonyDBCOnlineOnly:
         # Set the timezone for the first time
         self.set_timezone(self.prelim_session_timezone)
 
+        self.session_uuid = str(uuid6.uuid8())
+
+        if self.do_audit:
+            # Create the `tony` table if it doesn't exist
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+
+            # Construct the full path to the log.txt file
+            sql_path = pathlib.Path(current_dir) / "audit_table.sql"
+            assert sql_path.is_file()
+            cmd = prepare_scripts(self.database, [str(sql_path)])
+
+            self.execute(cmd, no_tracking=True)
+
     def set_timezone(self, session_timezone=None):
         """
         Set the IANA session time zone for display and input purposes for TIMEZONE fields
@@ -208,7 +275,9 @@ class __TonyDBCOnlineOnly:
         # Set the database session to be this time zone
         # any INSERT or UPDATE commands executed on TIMEZONE data types will assume
         # the data was expressed in this time zone.
-        self.execute(f"SET @@session.time_zone:='{self.session_time_offset}';")
+        self.execute(
+            f"SET @@session.time_zone:='{self.session_time_offset}';", no_tracking=True
+        )
         self.default_tz = dateutil.tz.gettz(self.session_timezone)
         assert self.default_tz is not None
 
@@ -226,6 +295,8 @@ class __TonyDBCOnlineOnly:
             self.commit()
         self._mariatonydbcn.close()
         self.log(f"TonyDBC mariadb connection closed.")
+        if self.do_audit:
+            self.log(f"TonyDBC debug logs at: {self.ipath}")
 
         if exit_type == SystemExit:
             self.log(f"TonyDBC: user typed exit() in interpreter.")
@@ -258,6 +329,9 @@ class __TonyDBCOnlineOnly:
         # Restore the original connection
         self._mariatonydbcn = self._mariatonydbcn_old
         self.using_temp_conn = False
+
+    def now(self):
+        return pd.Timestamp.now(tz=self.session_timezone)
 
     def cursor(self):
         return self._mariatonydbcn.cursor()
@@ -298,7 +372,7 @@ class __TonyDBCOnlineOnly:
         else:
             self._l.info(msg)
 
-    def column_info(self, table_name=None):
+    def column_info(self, table_name=None, no_tracking=False):
         """Returns the column information.
         Parameters:
             table_name: string.  If None, returns column info for ALL tables.
@@ -309,7 +383,8 @@ class __TonyDBCOnlineOnly:
 
         r = self.get_data(
             f"SELECT * FROM INFORMATION_SCHEMA.COLUMNS "
-            f"WHERE {'AND '.join(clauses)};"
+            f"WHERE {'AND '.join(clauses)};",
+            no_tracking=no_tracking,
         )
 
         return pd.DataFrame(r)
@@ -489,8 +564,22 @@ class __TonyDBCOnlineOnly:
 
         return df
 
-    def get_data(self, query: str):
-        return get_data(self._mariatonydbcn, query)
+    def get_data(self, query: str, no_tracking=False):
+        if self.do_audit and not no_tracking:
+            started_at = self.now()
+
+        payload = get_data(self._mariatonydbcn, query)
+
+        if self.do_audit and not no_tracking:
+            self._save_instrumentation(
+                method=inspect.currentframe().f_code.co_name,
+                table=None,
+                query=query,
+                started_at=started_at,
+                **get_payload_info(payload),
+            )
+
+        return payload
 
     @property
     def databases(self):
@@ -553,10 +642,18 @@ class __TonyDBCOnlineOnly:
             record = cursor.executemany(query, insert_data)
         return record
 
-    def execute(self, command: str, command_values=None, before_retry_cmd=None):
+    def execute(
+        self,
+        command: str,
+        command_values=None,
+        before_retry_cmd=None,
+        no_tracking=False,
+    ):
         """Parameters:
         command_values: a tuple of values [optional]
         """
+        if self.do_audit and not no_tracking:
+            started_at = self.now()
 
         attempts_remaining = MAX_RECONNECTION_ATTEMPTS
         while attempts_remaining > 0:
@@ -610,6 +707,15 @@ class __TonyDBCOnlineOnly:
             # mariadb.InterfaceError: Lost connection to server during query
             # mariadb.OperationalError: Can't connect to server on 'fling.ninja' (10060)
             # mariadb.InterfaceError: Server has gone away
+
+        if self.do_audit and not no_tracking:
+            self._save_instrumentation(
+                method=inspect.currentframe().f_code.co_name,
+                table=None,
+                query=command,
+                started_at=started_at,
+                **get_payload_info(command_values),
+            )
 
     def execute_script(
         self, script_path: str, get_return_values=False, cur_database=None
@@ -690,7 +796,8 @@ class __TonyDBCOnlineOnly:
                 WHERE 
                     TABLE_SCHEMA = '{self.database}' AND
                     CONSTRAINT_NAME = 'PRIMARY'
-                """
+                """,
+                no_tracking=True,
             )
             self._primary_keys = {v["TABLE_NAME"]: v["COLUMN_NAME"] for v in r}
             return self._primary_keys
@@ -715,7 +822,8 @@ class __TonyDBCOnlineOnly:
                 FROM INFORMATION_SCHEMA.`COLUMNS`
                 WHERE
                     TABLE_SCHEMA = '{self.database}'
-                """
+                """,
+                no_tracking=True,
             )
             tables = {v["TABLE_NAME"] for v in r}
             self._column_datatypes = {
@@ -777,7 +885,10 @@ class __TonyDBCOnlineOnly:
         command_values = list(map(str, stringified_row_dict.values()))
         self.execute(command=command, command_values=command_values)
 
-    def append_to_table(self, table, df, return_reindexed=False):
+    def append_to_table(self, table, df, return_reindexed=False, no_tracking=False):
+        if self.do_audit and not no_tracking:
+            started_at = self.now()
+
         pk = self.primary_keys[table]
         # For vanity's sake, give the dataframe index the correct name
         # but really we never actually use this index since we let the
@@ -792,15 +903,25 @@ class __TonyDBCOnlineOnly:
             columns_to_serialize = []
 
         df_serialized = serialize_table(df, col_dtypes, columns_to_serialize)
-
-        # Calculate memory used as a nice message for the user
-        memory_used_mb = df_serialized.memory_usage(deep=True).sum() / (1024**2)
+        payload_info = get_payload_info(df_serialized)
+        payload_size_MB = payload_info["payload_size"] / (1024**2)
 
         # Append our values to the actual database table
         self.log(
-            f"INSERT {len(df_serialized)} rows in {self.database}.{table} ({memory_used_mb:.2f} MB)"
+            f"INSERT {payload_info['num_rows']} rows & "
+            f"{payload_info['num_cols']} columns "
+            f"in {self.database}.{table} ({payload_size_MB:.2f} MB)"
         )
         self.write_dataframe(df_serialized, table, if_exists="append", index=False)
+
+        if self.do_audit and not no_tracking:
+            self._save_instrumentation(
+                method=inspect.currentframe().f_code.co_name,
+                table=table,
+                query="INSERT",
+                started_at=started_at,
+                **payload_info,
+            )
 
         # Return the dataframe with the actual index AUTOINCREMENTED with the correct numbers
         # This is actually GUARANTEED to work, by the way mariadb does consecutive inserts!
@@ -820,7 +941,18 @@ class __TonyDBCOnlineOnly:
         else:
             cols_to_deserialize = []
 
+        started_at = self.now()
+
         cur_df = self.read_dataframe_from_table(table, cols_to_deserialize, query=query)
+
+        if self.do_audit:
+            self._save_instrumentation(
+                method=inspect.currentframe().f_code.co_name,
+                table=table,
+                query=query,
+                started_at=started_at,
+                **get_payload_info(cur_df),
+            )
 
         return cur_df
 
@@ -873,6 +1005,99 @@ class __TonyDBCOnlineOnly:
             self.log(
                 f"ERROR | central_log warning : missing log parameters from - {failed_module}"
             )
+
+    def _save_instrumentation(
+        self,
+        method: str,
+        table: str,
+        query: str,
+        started_at: pd.Timestamp,
+        payload_size: int,
+        num_rows: int,
+        num_cols: int,
+    ):
+        """Save debugging information about each query that was run"""
+        if not self.do_audit:
+            return
+
+        # Save in the session timezone
+        started_at = started_at.tz_convert(self.session_timezone)
+        completed_at = self.now()
+        duration = (completed_at - started_at).total_seconds()
+
+        if (duration is not None) and duration > 0:
+            MBps = (payload_size / duration) / (1024 * 1024)
+        else:
+            MBps = None
+
+        # Extract the table name from the query string if necessary
+        if table is None or table == "":
+            table = get_next_word_after_from(query)
+
+        payload = {
+            "session_uuid": self.session_uuid,
+            "host": self.host,
+            "database_name": self.database,
+            "timezone": self.session_timezone,
+            "method": method,
+            "table_name": table,
+            "query": query,
+            "started_at": started_at,
+            "completed_at": completed_at,
+            "duration_seconds": duration,
+            "payload_size_bytes": payload_size,
+            "num_rows": num_rows,
+            "num_cols": num_cols,
+            "MBps": MBps,
+        }
+        df = pd.DataFrame([payload])
+        # Remove newlines in query
+        df["query"] = df["query"].str.strip().replace("\n", " ")
+
+        # Append this metadata to our `tony` table in the database
+        # don't track it or we will get infinite audit recursion
+        self.append_to_table("tony", df, no_tracking=True)
+
+        # If we aren't just tracking exclusively in the database,
+        # then write to a file please
+        if self.ipath != "database":
+            lock_path = self.ipath.with_suffix(self.ipath.suffix + ".lock")
+            with filelock.FileLock(lock_path) as lock:
+                try:
+                    df.to_csv(
+                        self.ipath,
+                        mode="a",
+                        header=(not self.ipath.exists()),
+                        index=False,
+                    )
+                except PermissionError as e:
+                    print(
+                        f"WARNING: Instrumentation file is locked for writing: "
+                        f"{self.ipath} {e}\n{payload}"
+                    )
+
+
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
 
 
 class TonyDBC(__TonyDBCOnlineOnly):
@@ -1055,11 +1280,11 @@ class TonyDBC(__TonyDBCOnlineOnly):
         else:
             super(TonyDBC, self).commit()
 
-    def get_data(self, query: str):
+    def get_data(self, query: str, no_tracking=False):
         if not self.is_online:
             raise AssertionError("get_data can only be used while online")
         else:
-            return super(TonyDBC, self).get_data(query)
+            return super(TonyDBC, self).get_data(query, no_tracking)
 
     def drop_database(self, database):
         if not self.is_online:
@@ -1129,11 +1354,18 @@ class TonyDBC(__TonyDBCOnlineOnly):
         else:
             self.__update_queue.put(("post_datalist", kwargs))
 
-    def execute(self, command: str, command_values=None, before_retry_cmd=None):
+    def execute(
+        self,
+        command: str,
+        command_values=None,
+        before_retry_cmd=None,
+        no_tracking=False,
+    ):
         kwargs = {
             "command": command,
             "command_values": command_values,
             "before_retry_cmd": before_retry_cmd,
+            "no_tracking": no_tracking,
         }
         if self.is_online:
             super(TonyDBC, self).execute(**kwargs)
@@ -1164,11 +1396,12 @@ class TonyDBC(__TonyDBCOnlineOnly):
         else:
             self.__update_queue.put(("insert_row_all_string", kwargs))
 
-    def append_to_table(self, table, df, return_reindexed=False):
+    def append_to_table(self, table, df, return_reindexed=False, no_tracking=False):
         kwargs = {
             "table": table,
             "df": df,
             "return_reindexed": return_reindexed,
+            "no_tracking": no_tracking,
         }
         if self.is_online:
             return super(TonyDBC, self).append_to_table(**kwargs)

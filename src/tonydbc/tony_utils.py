@@ -13,6 +13,8 @@ Support utilities for TonyDBC:
 """
 
 import os
+import sys
+import re
 import code
 import json
 import pytz
@@ -212,3 +214,71 @@ def get_tz_offset(iana_tz=None):
 def validate_tz_offset(iana_tz, tz_offset):
     """e.g. Validates that '07:00' is the correct offset from UTC for 'Asia/Bangkok'"""
     assert get_tz_offset(iana_tz) == tz_offset
+
+
+def get_next_word_after_from(input_string):
+    """Help to find the table name after FROM"""
+
+    # Convert the input string to uppercase for case-insensitive search
+    input_upper = input_string.upper()
+
+    # Use regex to search for the word after "FROM", stripping backticks (`))
+    match = re.search(r"\bFROM\b\s+`?([\w.]+)`?", input_upper)
+
+    if match:
+        # Use the match's span to get the range and
+        # extract the word from the original input string, preserving the original case.
+        start, end = match.span(1)
+        return input_string[start:end]
+    else:
+        return None
+
+
+def get_payload_info(payload):
+    """Get the size of a payload, which can be a dataframe or nested iterables of various kinds"""
+    payload_size = sys.getsizeof(payload)
+    if payload is None:
+        num_rows = 0
+        num_cols = 0
+    elif isinstance(payload, pd.DataFrame):
+        payload_size = payload.memory_usage(deep=True).sum()
+        num_rows, num_cols = payload.shape
+    elif hasattr(payload, "__len__"):
+        num_rows = len(payload)
+        if num_rows == 0:
+            num_cols = 0
+        elif hasattr(payload[0], "__len__"):
+            num_cols = len(payload[0])
+        else:
+            num_cols = 0
+    else:
+        num_rows = 0
+        num_cols = 0
+    return {
+        "payload_size": payload_size,
+        "num_rows": num_rows,
+        "num_cols": num_cols,
+    }
+
+
+def prepare_scripts(test_db: str, schema_filepaths: typing.List[str]):
+    """Return a string consisting of all the contents of the scripts provided
+
+    Parameters:
+        test_db: a string
+        schema_filepaths: a list of strings which are paths to scripts
+
+    """
+    assert not isinstance(
+        schema_filepaths, str
+    ), f"schema_filepaths ({schema_filepaths}) must be a list"
+    program_to_run0 = ""
+
+    # Run all the scripts requested
+    for schema_filepath in schema_filepaths:
+        program_to_run0 += f"\n\n\nUSE {test_db};\n"
+        with open(schema_filepath, "r") as f:
+            program_to_run0 += f.read()
+        program_to_run0 += "\n\n\n"
+
+    return program_to_run0
