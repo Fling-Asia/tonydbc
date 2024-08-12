@@ -11,15 +11,15 @@ To instrument TonyDBC to diagnose performance:
 
      simply populate the following in .env:
 
-        INSTRUMENTATION_PATH = C:\\tony_log.csv
+        AUDIT_PATH = C:\\tony_log.csv
 
     or to populate ONLY the database table `tony`:
 
-        INSTRUMENTATION_PATH = database
+        AUDIT_PATH = database
 
     or to disable performance logging:
 
-        INSTRUMENTATION_PATH =
+        AUDIT_PATH =
 
 DOCUMENTATION
 
@@ -156,8 +156,8 @@ class __TonyDBCOnlineOnly:
         self.do_audit = False
 
         # For debugging purposes, we may wish to instrument all queries
-        if "INSTRUMENTATION_PATH" in os.environ:
-            ipath = os.environ["INSTRUMENTATION_PATH"]
+        if "AUDIT_PATH" in os.environ:
+            ipath = os.environ["AUDIT_PATH"]
             if ipath == "database":
                 # Track only on the database, not locally
                 self.do_audit = True
