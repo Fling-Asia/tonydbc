@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tonydbc"
-version = "1.1.0"
+version = "1.2.0"
 description = "A high-level database connector for MariaDB"
 readme = "README.md"
 authors = [{ name = "Michael Currie", email = "mcurrie@gmail.com" }]
@@ -41,7 +41,7 @@ dev = ["black", "bumpver", "isort", "pip-tools", "pytest"]
 Homepage = "https://github.com/Fling-Asia/tonydbc"
 
 [tool.bumpver]
-current_version = "1.1.0"
+current_version = "1.2.0"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "bump version {old_version} -> {new_version}"
 tag_message = "{new_version}"
