@@ -296,7 +296,9 @@ class __TonyDBCOnlineOnly:
         self._mariatonydbcn.close()
         self.log(f"TonyDBC mariadb connection closed.")
         if self.do_audit:
-            self.log(f"TonyDBC debug logs at: {self.ipath}")
+            self.log(f"TonyDBC debug logs at: `{self.host}`.`{self.database}`.`tony`")
+            if self.ipath != "database":
+                self.log(f"TonyDBC debug logs also at: {self.ipath}")
 
         if exit_type == SystemExit:
             self.log(f"TonyDBC: user typed exit() in interpreter.")
