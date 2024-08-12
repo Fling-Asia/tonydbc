@@ -21,7 +21,6 @@ import os
 import sys
 import logging
 import dotenv
-from dotenv import load_dotenv
 import json
 import pathlib
 from collections import Counter
@@ -222,7 +221,7 @@ def load_dotenvs():
         - Also, check these files against their .env.example files for omissions
     """
     # Load .env wherever it may be
-    load_dotenv(override=True)
+    dotenv.load_dotenv(override=True)
     # Also, the .env file in the script's path, if any
     base_env_path = os.path.join(sys.path[0], ".env")
     if not os.path.isfile(base_env_path):
@@ -234,7 +233,7 @@ def load_dotenvs():
             return
     else:
         print(f"LOADING BASE ENV {base_env_path}")
-        load_dotenv(base_env_path, override=True)
+        dotenv.load_dotenv(base_env_path, override=True)
 
     if "DOT_ENVS" in os.environ:
         # Get every .env we are supposed to load

@@ -28,7 +28,10 @@ e.g.
 
 __version__ = "1.1.0"
 
-from .env_utils import get_env_bool, get_env_list, load_dotenv, load_dotenvs
+# Include vanialla dotenv.load_dotenv to be comprehensive, but it's not really needed
+# since the version people should use is load_dotenvs
+from dotenv import load_dotenv
+from .env_utils import get_env_bool, get_env_list, load_dotenvs
 from .tony_utils import (
     set_MYSQL_DATABASE,
     get_current_time,
