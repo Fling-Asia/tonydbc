@@ -79,6 +79,9 @@ from .tony_utils import prepare_scripts
 # Max number of times to re-try a command if connection is lost
 MAX_RECONNECTION_ATTEMPTS = 3
 
+# Maximum characters to output to `tony`.`query`
+QUERY_AUDIT_MAX_CHARS = 500
+
 
 def check_connection(fn):
     def conn_wrapper(self, *args, **kwargs):
@@ -1037,20 +1040,20 @@ class __TonyDBCOnlineOnly:
             table = get_next_word_after_from(query)
 
         payload = {
-            "session_uuid": self.session_uuid,
-            "host": self.host,
-            "database_name": self.database,
-            "timezone": self.session_timezone,
-            "method": method,
             "table_name": table,
-            "query": query,
+            "query": query[:QUERY_AUDIT_MAX_CHARS],
             "started_at": started_at,
             "completed_at": completed_at,
             "duration_seconds": duration,
             "payload_size_bytes": payload_size,
             "num_rows": num_rows,
             "num_cols": num_cols,
+            "method": method,
             "MBps": MBps,
+            "session_uuid": self.session_uuid,
+            "host": self.host,
+            "database_name": self.database,
+            "timezone": self.session_timezone,
         }
         df = pd.DataFrame([payload])
         # Remove newlines in query
