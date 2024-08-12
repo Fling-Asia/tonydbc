@@ -11,6 +11,7 @@ common point to prevent messy path finding
     load_dotenvs
         it's nice but not necessary for the following variables to be set already:
             CHECK_ENVIRONMENT_INTEGRITY
+            AUDIT_PATH
             DOT_ENVS
 
 load_dotenvs() is all you need in most cases
@@ -21,13 +22,16 @@ import os
 import sys
 import logging
 import dotenv
-from dotenv import load_dotenv
 import json
 import pathlib
 from collections import Counter
 
+# These warnings are very verbose and annoying, so we'll skip them for now
+WARN_MISSING_PATHS = False
 
-# We need this to capture the logging warning "Python-dotenv could not parse statement starting at line 1"
+
+# We need this to capture the logging warning
+# "Python-dotenv could not parse statement starting at line 1"
 class CaptureLogsHandler(logging.Handler):
     def __init__(self):
         super().__init__()
@@ -133,16 +137,16 @@ def check_environment_variable_integrity(env_filepath):
     for current_key in path_keys:
         k_prefix = f".env {env_filepath} has variable {current_key}"
         current_path = current_env[current_key]
-        continue
-        # These warnings are very verbose and annoying, so we'll skip them
-        if current_path == "":
-            print(f"WARNING: {k_prefix} which is blank.")
-            continue
-        if not (os.path.isdir(current_path) or os.path.isfile(current_path)):
-            print(
-                "WARNING: "
-                f"For {k_prefix} with path {current_path} which is not a valid path on your machine."
-            )
+
+        if WARN_MISSING_PATHS:
+            if current_path == "":
+                print(f"WARNING: {k_prefix} which is blank.")
+                continue
+            if not (os.path.isdir(current_path) or os.path.isfile(current_path)):
+                print(
+                    "WARNING: "
+                    f"For {k_prefix} with path {current_path} which is not a valid path on your machine."
+                )
 
 
 def get_env_bool(key):
@@ -222,7 +226,7 @@ def load_dotenvs():
         - Also, check these files against their .env.example files for omissions
     """
     # Load .env wherever it may be
-    load_dotenv(override=True)
+    dotenv.load_dotenv(override=True)
     # Also, the .env file in the script's path, if any
     base_env_path = os.path.join(sys.path[0], ".env")
     if not os.path.isfile(base_env_path):
@@ -234,7 +238,7 @@ def load_dotenvs():
             return
     else:
         print(f"LOADING BASE ENV {base_env_path}")
-        load_dotenv(base_env_path, override=True)
+        dotenv.load_dotenv(base_env_path, override=True)
 
     if "DOT_ENVS" in os.environ:
         # Get every .env we are supposed to load

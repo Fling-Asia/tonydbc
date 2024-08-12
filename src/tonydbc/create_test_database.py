@@ -7,26 +7,7 @@ import os
 import pathlib
 import pyperclip
 from .tonydbc import TonyDBC
-
-
-def run_scripts(test_db: str, schema_filepaths):
-    """Return a string consisting of all the contents of the scripts provided
-
-    Parameters:
-        test_db: a string
-        schema_filepaths: a list of strings which are paths to scripts
-
-    """
-    program_to_run0 = ""
-
-    # Run all the scripts requested
-    for schema_filepath in schema_filepaths:
-        program_to_run0 += f"\n\n\nUSE {test_db};\n"
-        with open(schema_filepath, "r") as f:
-            program_to_run0 += f.read()
-        program_to_run0 += "\n\n\n"
-
-    return program_to_run0
+from .tony_utils import prepare_scripts
 
 
 def create_test_database(
@@ -94,7 +75,7 @@ def create_test_database(
     non_trigger_scripts = [f for f in schema_filepaths if str(f).find("trigger") == -1]
     trigger_scripts = [f for f in schema_filepaths if str(f).find("trigger") != -1]
 
-    program_to_run += run_scripts(test_db, non_trigger_scripts)
+    program_to_run += prepare_scripts(test_db, non_trigger_scripts)
 
     program_to_run += f"USE {test_db};\nSET FOREIGN_KEY_CHECKS = 0;\n"
 
@@ -133,7 +114,7 @@ def create_test_database(
 
     program_to_run += "\n".join(custom_commands)
 
-    program_to_run += run_scripts(test_db, trigger_scripts)
+    program_to_run += prepare_scripts(test_db, trigger_scripts)
 
     program_to_run += "\nSET FOREIGN_KEY_CHECKS = 1;"
 

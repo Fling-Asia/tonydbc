@@ -249,14 +249,24 @@ class DataFrameFast(pd.DataFrame):
                 ]
             except ValueError as e:
                 if get_env_bool("INTERACT_AFTER_ERROR"):
-                    code.interact(local=locals(), banner="tupling no workie")
+                    code.interact(
+                        local=locals(), banner=f"DataFrameFast tupling error: {e}"
+                    )
                 else:
                     raise ValueError(e)
 
             # Optimization: just use `execute` if it's a single line of data
             if len(table_data) == 1:
                 with con.cursor() as cursor:
-                    cursor.execute(cmd, table_data[0])
+                    try:
+                        cursor.execute(cmd, table_data[0])
+                    except Exception as e:
+                        if get_env_bool("INTERACT_AFTER_ERROR"):
+                            code.interact(
+                                banner=f"DataFrameFast error: {e}", local=locals()
+                            )
+                        else:
+                            raise Exception(e)
                 return
 
             # 2. A workaround to https://jira.mariadb.org/browse/CONPY-254
