@@ -188,6 +188,7 @@ class __TonyDBCOnlineOnly:
                 read_timeout=3600,  # 15,  # in seconds
                 write_timeout=3600,  # 20  # in seconds
                 local_infile=True,
+                compress=True,
             )
         except mariadb.InterfaceError as e:
             raise Exception(
