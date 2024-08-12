@@ -377,7 +377,7 @@ class __TonyDBCOnlineOnly:
         else:
             self._l.info(msg)
 
-    def column_info(self, table_name=None, no_tracking=False):
+    def column_info(self, table_name=None):
         """Returns the column information.
         Parameters:
             table_name: string.  If None, returns column info for ALL tables.
@@ -389,7 +389,7 @@ class __TonyDBCOnlineOnly:
         r = self.get_data(
             f"SELECT * FROM INFORMATION_SCHEMA.COLUMNS "
             f"WHERE {'AND '.join(clauses)};",
-            no_tracking=no_tracking,
+            no_tracking=True,
         )
 
         return pd.DataFrame(r)
@@ -397,7 +397,9 @@ class __TonyDBCOnlineOnly:
     @property
     def last_insert_id(self):
         # No need to do a commit here necessarily...
-        return self.get_data("SELECT LAST_INSERT_ID() AS id;")[0]["id"]
+        return self.get_data("SELECT LAST_INSERT_ID() AS id;", no_tracking=True)[0][
+            "id"
+        ]
 
     def use(self, new_database: str):
         """Change databases"""
@@ -573,7 +575,7 @@ class __TonyDBCOnlineOnly:
         if self.do_audit and not no_tracking:
             started_at = self.now()
 
-        payload = get_data(self._mariatonydbcn, query)
+        payload = get_data(self._mariatonydbcn, query=query)
 
         if self.do_audit and not no_tracking:
             self._save_instrumentation(
@@ -593,11 +595,14 @@ class __TonyDBCOnlineOnly:
     @property
     def users(self):
         return [
-            (d["Host"], d["User"]) for d in self.get_data("SELECT * FROM mysql.user")
+            (d["Host"], d["User"])
+            for d in self.get_data("SELECT * FROM mysql.user", no_tracking=True)
         ]
 
     def show_grants(self, username: str, host="%"):
-        return self.get_data(f"SHOW GRANTS FOR '{username}'@'{host}';")
+        return self.get_data(
+            f"SHOW GRANTS FOR '{username}'@'{host}';", no_tracking=True
+        )
 
     @property
     def production_databases(self):
@@ -1291,7 +1296,7 @@ class TonyDBC(__TonyDBCOnlineOnly):
         if not self.is_online:
             raise AssertionError("get_data can only be used while online")
         else:
-            return super(TonyDBC, self).get_data(query, no_tracking)
+            return super(TonyDBC, self).get_data(query=query, no_tracking=no_tracking)
 
     def drop_database(self, database):
         if not self.is_online:
