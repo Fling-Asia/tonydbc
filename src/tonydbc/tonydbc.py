@@ -913,20 +913,10 @@ class __TonyDBCOnlineOnly:
 
         # Append our values to the actual database table
         self.log(
-            f"INSERT {payload_info['num_rows']} rows & "
-            f"{payload_info['num_cols']} columns "
+            f"INSERT {payload_info['num_rows']}r x {payload_info['num_cols']}c "
             f"in {self.database}.{table} ({payload_size_MB:.2f} MB)"
         )
         self.write_dataframe(df_serialized, table, if_exists="append", index=False)
-
-        if self.do_audit and not no_tracking:
-            self._save_instrumentation(
-                method=inspect.currentframe().f_code.co_name,
-                table=table,
-                query="INSERT",
-                started_at=started_at,
-                **payload_info,
-            )
 
         # Return the dataframe with the actual index AUTOINCREMENTED with the correct numbers
         # This is actually GUARANTEED to work, by the way mariadb does consecutive inserts!
@@ -937,7 +927,19 @@ class __TonyDBCOnlineOnly:
             # NOT this:
             # df.index = list(range(self.last_insert_id - len(df) + 1, self.last_insert_id))
             df.index.name = pk
-            return df
+        else:
+            df = None
+
+        if self.do_audit and not no_tracking:
+            self._save_instrumentation(
+                method=inspect.currentframe().f_code.co_name,
+                table=table,
+                query="INSERT",
+                started_at=started_at,
+                **payload_info,
+            )
+
+        return df
 
     def query_table(self, table, query=None):
         """Query a single table and deserialize if necessary"""
