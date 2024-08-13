@@ -23,10 +23,10 @@ To publish a new version of tonydbc to PyPI:
 4. Run these commands:
 
 ```bash
-python -m pip install build twine bumpver
+# python -m pip install build twine bumpver
 bumpver update --no-push -n --patch
 python -m build
 twine check dist/*
-twine upload -r testpypi dist/*
+# twine upload -r testpypi dist/*
 twine upload dist/*
 ```
