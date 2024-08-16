@@ -82,6 +82,15 @@ MAX_RECONNECTION_ATTEMPTS = 3
 # Maximum characters to output to `tony`.`query`
 QUERY_AUDIT_MAX_CHARS = 500
 
+# Default to these environment variables if no credentials are provided
+DEFAULT_CREDENTIALS = {
+    "host": "MYSQL_HOST",
+    "user": "MYSQL_READWRITE_USER",
+    "password": "MYSQL_READWRITE_PASSWORD",
+    "database": "MYSQL_DATABASE"
+}
+
+
 
 def check_connection(fn):
     def conn_wrapper(self, *args, **kwargs):
@@ -114,10 +123,10 @@ class __TonyDBCOnlineOnly:
 
     def __init__(
         self,
-        host,
-        user,
-        password,
-        database,
+        host=None,
+        user=None,
+        password=None,
+        database=None,
         port=3306,
         media_to_deserialize=[],
         autocommit=True,
@@ -133,9 +142,22 @@ class __TonyDBCOnlineOnly:
                                     connection to the database is lost
                                     while running an SQL command.
         """
-        required_fields = [host, user, password, database, port]
-        if any(k is None or (type(k) == str and k == "") for k in required_fields):
-            raise AssertionError("TonyDBC: Not all credentials provided.")
+        for field, env_key in DEFAULT_CREDENTIALS.items():
+            param_value = locals().get(field, None)
+            if param_value is None:
+                # Try to grab the default
+                if env_key in os.environ:
+                    setattr(self, field, os.environ[env_key])
+                else:
+                    raise AssertionError(f"TonyDBC: Not all credentials provided: "
+                        f" e.g. {field} not provided and not in os.environ.  You must provide {DEFAULT_CREDENTIALS}")                
+            else:
+                setattr(self, field, param_value)
+
+            val = getattr(self, field, "")
+            assert isinstance(val, str), f"TonyDBC: Credential {field} ({val}) should be a string, not {type(val).__name__}"
+            assert len(val) > 0, f"TonyDBC: Credential {field} ({val}) should be a string of length > 0."
+
 
         # uuid will be set when the connection is made
         self.session_uuid = str(uuid6.uuid8())
