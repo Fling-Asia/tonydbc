@@ -229,22 +229,24 @@ def load_dotenvs():
     dotenv.load_dotenv(override=True)
     # Also, the .env file in the script's path, if any
     base_env_path = os.path.join(sys.path[0], ".env")
-    if not os.path.isfile(base_env_path):
-        print(f"WARNING: {base_env_path} .env file does not exist.")
-
-        # Last resort: try seeing if it's just already there in os.environ anyway
-        if not "DOT_ENVS" in os.environ:
-            print(f"WARNING: No BASE ENV `DOT_ENVS` present.")
-            return
-    else:
+    if os.path.isfile(base_env_path):
         print(f"LOADING BASE ENV {base_env_path}")
         dotenv.load_dotenv(base_env_path, override=True)
+    else:
+        print(f"WARNING: base env {base_env_path} .env file does not exist.")
 
     if "DOT_ENVS" in os.environ:
         # Get every .env we are supposed to load
         env_paths_raw = get_env_list("DOT_ENVS")
-    else:
+    elif os.path.isfile(base_env_path):
         env_paths_raw = [base_env_path]
+        print(
+            f"WARNING: No `DOT_ENVS` in os.environ, "
+            f"so defaulting to `DOT_ENVS` = {env_paths_raw}"
+        )
+    else:
+        print(f"WARNING: No `DOT_ENVS` in os.environ, and no base env file.")
+        env_paths_raw = []
 
     # In some contexts, like docker on the server, it's impractical
     # to check environment integrity so let's do it only optionally
@@ -259,15 +261,19 @@ def load_dotenvs():
     # Resolve the path to remove any pesky ".."s
     env_paths = [str(pathlib.Path(p).resolve()) for p in env_paths]
 
+    env_paths_str = "\n".join(env_paths)
+    print(f"`DOT_ENVS` are:\n{env_paths_str}")
+
     # Load and check these files against their .env.example files for omissions
     for env_path in env_paths:
         if not os.path.isfile(env_path):
             print(f"WARNING: env path {env_path} does not exist")
             continue
-        print(f"LOADING  {env_path}")
+        print(f"LOADING env_path {env_path}")
         dotenv.load_dotenv(env_path, override=True)
         if do_check:
-            print(f"CHECKING {env_path}")
+            print(f"CHECKING env_path {env_path}")
             # Check environment variables are consistent between .env and .env.example
             check_environment_variable_integrity(env_path)
+
     return env_paths

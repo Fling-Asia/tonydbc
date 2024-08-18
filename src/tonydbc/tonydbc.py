@@ -87,9 +87,8 @@ DEFAULT_CREDENTIALS = {
     "host": "MYSQL_HOST",
     "user": "MYSQL_READWRITE_USER",
     "password": "MYSQL_READWRITE_PASSWORD",
-    "database": "MYSQL_DATABASE"
+    "database": "MYSQL_DATABASE",
 }
-
 
 
 def check_connection(fn):
@@ -149,22 +148,23 @@ class __TonyDBCOnlineOnly:
                 if env_key in os.environ:
                     setattr(self, field, os.environ[env_key])
                 else:
-                    raise AssertionError(f"TonyDBC: Not all credentials provided: "
-                        f" e.g. {field} not provided and not in os.environ.  You must provide {DEFAULT_CREDENTIALS}")                
+                    raise AssertionError(
+                        f"TonyDBC: Not all credentials provided: "
+                        f" e.g. {field} not provided and not in os.environ.  You must provide {DEFAULT_CREDENTIALS}"
+                    )
             else:
                 setattr(self, field, param_value)
 
             val = getattr(self, field, "")
-            assert isinstance(val, str), f"TonyDBC: Credential {field} ({val}) should be a string, not {type(val).__name__}"
-            assert len(val) > 0, f"TonyDBC: Credential {field} ({val}) should be a string of length > 0."
-
+            assert isinstance(
+                val, str
+            ), f"TonyDBC: Credential {field} ({val}) should be a string, not {type(val).__name__}"
+            assert (
+                len(val) > 0
+            ), f"TonyDBC: Credential {field} ({val}) should be a string of length > 0."
 
         # uuid will be set when the connection is made
         self.session_uuid = str(uuid6.uuid8())
-        self.host = host
-        self.database = database
-        self.user = user
-        self.password = password
         self.port = port
         self.media_to_deserialize = media_to_deserialize
         self.autocommit = autocommit
