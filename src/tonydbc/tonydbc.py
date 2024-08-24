@@ -43,6 +43,7 @@ import io
 import sys
 import code
 import json
+import random
 import pytz
 import zoneinfo
 import inspect
@@ -59,6 +60,7 @@ import pathlib
 import queue
 import filelock
 import uuid6
+from contextlib import contextmanager
 
 # Use the official mariadb Python connection library
 import mariadb
@@ -80,7 +82,7 @@ from .tony_utils import prepare_scripts
 MAX_RECONNECTION_ATTEMPTS = 3
 
 # Maximum characters to output to `tony`.`query`
-QUERY_AUDIT_MAX_CHARS = 500
+QUERY_AUDIT_MAX_CHARS = 1000
 
 # Default to these environment variables if no credentials are provided
 DEFAULT_CREDENTIALS = {
@@ -482,12 +484,14 @@ class __TonyDBCOnlineOnly:
             l.log(f"UPDATE 0 rows in {self.database}.{table_name}")
             return
 
-        pk = self.primary_keys[table_name]
+        pk = self.get_primary_key(table=table_name, default="id")
         # For vanity's sake, give the dataframe index the correct name
         df.index.name = pk
         # We don't try to cast the primary key (which is always an int)
         col_dtypes = {
-            k: v for k, v in self.column_datatypes[table_name].items() if k != pk
+            k: v
+            for k, v in self.get_column_datatypes(table=table_name).items()
+            if k != pk
         }
 
         if table_name in self.media_to_deserialize:
@@ -564,11 +568,7 @@ class __TonyDBCOnlineOnly:
         full_name = ".".join([self.database, table_name])
         df = read_sql_table(name=full_name, con=self._mariatonydbcn, query=query)
 
-        try:
-            primary_key = self.primary_keys[table_name]
-        except KeyError as e:
-            # KLUDGE
-            primary_key = "id"
+        primary_key = self.get_primary_key(table=table_name, default="id")
 
         # If the primary key was selected, then use it, otherwise leave the table with no index
         if primary_key in df.columns:
@@ -813,6 +813,45 @@ class __TonyDBCOnlineOnly:
         if get_return_values:
             return return_values
 
+    def get_primary_key(self, table: str, default: str = None):
+        try:
+            return self.primary_keys[table]
+        except KeyError as _:
+            # Try refreshing before returning the error
+            self.refresh_primary_keys()
+            try:
+                return self.primary_keys[table]
+            except KeyError as _:
+                # Maybe it's a temporary table or something; try to DESCRIBE it.
+                result = self.get_data(f"DESCRIBE {table};", no_tracking=True)
+                if len(result) == 0:
+                    raise KeyError(f"Table {table} does not seem to exist.")
+                primary_keys = [col for col in result if col["Key"] == "PRI"]
+                if len(primary_keys) == 0:
+                    if default is not None:
+                        return default
+                    raise KeyError(
+                        f"Table {table} is not in our list of tables with "
+                        f"primary keys: {self.primary_keys}.  (And no default was provided)"
+                    )
+                elif len(primary_keys) > 1:
+                    raise KeyError(f"Table {table} has more than one primary key!")
+                else:
+                    return primary_keys[0]["Field"]
+
+    def refresh_primary_keys(self):
+        r = self.get_data(
+            query=f"""
+            SELECT TABLE_NAME, COLUMN_NAME
+            FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+            WHERE 
+                TABLE_SCHEMA = '{self.database}' AND
+                CONSTRAINT_NAME = 'PRIMARY'
+            """,
+            no_tracking=True,
+        )
+        self._primary_keys = {v["TABLE_NAME"]: v["COLUMN_NAME"] for v in r}
+
     @property
     def primary_keys(self):
         """Returns a dict of all tables in the database
@@ -822,18 +861,23 @@ class __TonyDBCOnlineOnly:
         try:
             return self._primary_keys
         except AttributeError:
-            r = self.get_data(
-                query=f"""
-                SELECT TABLE_NAME, COLUMN_NAME
-                FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-                WHERE 
-                    TABLE_SCHEMA = '{self.database}' AND
-                    CONSTRAINT_NAME = 'PRIMARY'
-                """,
-                no_tracking=True,
-            )
-            self._primary_keys = {v["TABLE_NAME"]: v["COLUMN_NAME"] for v in r}
+            self.refresh_primary_keys()
             return self._primary_keys
+
+    def get_column_datatypes(self, table: str):
+        try:
+            return self.column_datatypes[table]
+        except KeyError:
+            # Maybe it's a temporary table or something; try to DESCRIBE it.
+            result = self.get_data(f"DESCRIBE {table};")
+            if len(result) == 0:
+                raise KeyError(f"Table {table} does not seem to exist.")
+            # We need to map Types like "bigint(20)" to "bigint" to match our DATATYPE_MAP
+            col_datatypes = {
+                v["Field"]: DATATYPE_MAP[v["Type"].split("(")[0].strip().lower()]
+                for v in result
+            }
+            return col_datatypes
 
     @property
     def column_datatypes(self):
@@ -871,8 +915,8 @@ class __TonyDBCOnlineOnly:
 
     def non_primary_keys(self, table):
         """Returns a list of all non-primary keys for a table"""
-        pk = self.primary_keys[table]
-        cols = self.column_datatypes[table].keys()
+        pk = self.get_primary_key(table=table)
+        cols = self.get_column_datatypes(table=table).keys()
         return [c for c in cols if c != pk]
 
     @property
@@ -918,17 +962,42 @@ class __TonyDBCOnlineOnly:
         command_values = list(map(str, stringified_row_dict.values()))
         self.execute(command=command, command_values=command_values)
 
+    @contextmanager
+    def temp_id_table(self, id_list):
+        """Create a temporary table filled with ids for JOINing purposes"""
+        # Generate a random temporary table name
+        temp_table_name = f"temp_loc_ids_{random.randint(1000, 9999)}"
+
+        try:
+            # Create the temporary table
+            self.execute(
+                f"CREATE TEMPORARY TABLE {temp_table_name} (`id` BIGINT PRIMARY KEY);"
+            )
+
+            # Insert the data into the temporary table
+            df = pd.DataFrame(id_list, columns=["id"])
+            self.append_to_table(temp_table_name, df)
+
+            # Yield the temporary table name to the context
+            yield temp_table_name
+
+        finally:
+            # Drop the temporary table when the context ends
+            self.execute(f"DROP TEMPORARY TABLE IF EXISTS {temp_table_name};")
+
     def append_to_table(self, table, df, return_reindexed=False, no_tracking=False):
         if self.do_audit and not no_tracking:
             started_at = self.now()
 
-        pk = self.primary_keys[table]
+        pk = self.get_primary_key(table=table, default="id")
         # For vanity's sake, give the dataframe index the correct name
         # but really we never actually use this index since we let the
         # database autoincrement during the insert
         df.index.name = pk
         # We don't try to cast the primary key (which is always an int)
-        col_dtypes = {k: v for k, v in self.column_datatypes[table].items() if k != pk}
+        col_dtypes = {
+            k: v for k, v in self.get_column_datatypes(table=table).items() if k != pk
+        }
 
         if table in self.media_to_deserialize:
             columns_to_serialize = self.media_to_deserialize[table]

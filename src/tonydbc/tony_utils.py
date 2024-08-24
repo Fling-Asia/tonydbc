@@ -282,3 +282,43 @@ def prepare_scripts(test_db: str, schema_filepaths: typing.List[str]):
         program_to_run0 += "\n\n\n"
 
     return program_to_run0
+
+
+# This might be quite a large string but hopefully SQL doesn't choke
+# Convert a list [1,2,3] into string "(1,2,3)"
+def list_to_SQL(v):
+    if all(type(k) == str for k in v):
+        return "(" + ",".join([f"'{k}'" for k in v]) + ")"
+    elif all(type(k) != str for k in v):
+        return "(" + ",".join([f"{k}" for k in v]) + ")"
+    else:
+        raise AssertionError(f"Elements in the list are of mixed type: {v}")
+
+
+def list_to_SQL2(col_ids, column_name):
+    """A more advanced version that also uses ranges"""
+    col_ids = np.unique(np.sort(col_ids))  # Sort and remove duplicates
+    diffs = np.diff(col_ids)  # Get the difference between consecutive elements
+
+    # Find indices where the difference is greater than 1 (i.e., a break in a range)
+    breaks = np.where(diffs > 1)[0]
+
+    # Start each range at the beginning or after a break
+    starts = np.concatenate(([0], breaks + 1))
+    # End each range at the break or at the end of the array
+    ends = np.concatenate((breaks, [len(col_ids) - 1]))
+
+    singletons = []
+    queries = []
+    for start, end in zip(starts, ends):
+        if col_ids[start] == col_ids[end]:
+            singletons.append(col_ids[start])
+        else:
+            queries.append(
+                f"({column_name} BETWEEN {col_ids[start]} AND {col_ids[end]})"
+            )
+
+    if len(singletons) > 0:
+        queries.append(f"{column_name} in {list_to_SQL(singletons)}")
+
+    return " OR ".join(queries)
