@@ -420,11 +420,21 @@ class __TonyDBCOnlineOnly:
         return pd.DataFrame(r)
 
     @property
-    def last_insert_id(self):
+    def _last_insert_id(self):
         # No need to do a commit here necessarily...
         return self.get_data("SELECT LAST_INSERT_ID() AS id;", no_tracking=True)[0][
             "id"
         ]
+
+    @property
+    def last_insert_id(self):
+        if self.do_audit:
+            raise AssertionError(
+                "last_insert_id is not stable if audit is on (it will return "
+                "the last_insert_id from the `tony` table instead). Please use return_reindexed "
+                " and then grab the value from df.iloc[0].name if you inserted one row"
+            )
+        return self._last_insert_id
 
     def use(self, new_database: str):
         """Change databases"""
@@ -1020,9 +1030,9 @@ class __TonyDBCOnlineOnly:
         # cool right?
         if return_reindexed:
             # From testing on 2023-11-24, THIS is correct:
-            df.index = list(range(self.last_insert_id, self.last_insert_id + len(df)))
+            df.index = list(range(self._last_insert_id, self._last_insert_id + len(df)))
             # NOT this:
-            # df.index = list(range(self.last_insert_id - len(df) + 1, self.last_insert_id))
+            # df.index = list(range(self._last_insert_id - len(df) + 1, self._last_insert_id))
             df.index.name = pk
         else:
             df = None

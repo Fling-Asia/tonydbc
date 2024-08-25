@@ -91,8 +91,10 @@ def create_test_database(
         cur_source_db, table = table_string.split(".")
         # print(f"COPY {table_string} -> {test_db}.{table}")
         cmd = (
+            f"ALTER TABLE `{test_db}`.`{table}` DISABLE KEYS; "
             f"INSERT INTO `{test_db}`.`{table}` "
             f"SELECT * FROM `{cur_source_db}`.`{table}` LIMIT {max_rows};\n"
+            f" ALTER TABLE `{test_db}`.`{table}` ENABLE KEYS;"
         )
         program_to_run += cmd
 
