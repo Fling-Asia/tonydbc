@@ -93,8 +93,8 @@ def create_test_database(
         cmd = (
             f"ALTER TABLE `{test_db}`.`{table}` DISABLE KEYS; "
             f"INSERT INTO `{test_db}`.`{table}` "
-            f"SELECT * FROM `{cur_source_db}`.`{table}` LIMIT {max_rows};\n"
-            f" ALTER TABLE `{test_db}`.`{table}` ENABLE KEYS;"
+            f"SELECT * FROM `{cur_source_db}`.`{table}` LIMIT {max_rows}; "
+            f"ALTER TABLE `{test_db}`.`{table}` ENABLE KEYS;\n"
         )
         program_to_run += cmd
 
