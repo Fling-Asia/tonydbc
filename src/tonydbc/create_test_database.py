@@ -85,6 +85,9 @@ def create_test_database(
         ".".join([source_db, table]): max_rows
         for table, max_rows in tables_to_copy.items()
     }
+    # Let's make it alphabetical for convenience during debugging
+    # (note that e.g. "B" comes before "a", in lexicographical order, due to upper case being first)
+    tables_to_copy = dict(sorted(tables_to_copy.items()))
     for table_string, max_rows in tables_to_copy.items():
         # Convert from 'src_db.table'
         assert "." in table_string
