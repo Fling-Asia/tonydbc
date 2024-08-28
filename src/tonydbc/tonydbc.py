@@ -491,7 +491,7 @@ class __TonyDBCOnlineOnly:
 
         """
         if len(df) == 0:
-            l.log(f"UPDATE 0 rows in {self.database}.{table_name}")
+            print(f"UPDATE 0 rows in {self.database}.{table_name}")
             return
 
         pk = self.get_primary_key(table=table_name, default="id")
