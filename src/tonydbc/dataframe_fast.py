@@ -137,6 +137,7 @@ class DataFrameFast(pd.DataFrame):
                 )
 
                 # Force the dtype conversion, which otherwise doesn't happen for some reason
+                df0 = df0.drop(columns=[dt_col])
                 df0.loc[:, dt_col] = ""
                 df0.loc[:, dt_col] = "override"
                 df0.loc[:, dt_col] = df0.loc[:, dt_col].astype(str)
