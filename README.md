@@ -39,7 +39,7 @@ sudo apt-get install -y wget curl python3-packaging gcc
 
 # Install mariadb CS Package Repository so apt-get can find the right package
 # See https://mariadb.com/docs/skysql/connect/programming-languages/c/install/#Installation_via_Package_Repository_(Linux)
-wget https://r.mariadb.com/downloads/mariadb_repo_setup
+wget https://r.mariadb.com/downloads/mariadb_repo_setup || wget https://downloads.mariadb.com/MariaDB/mariadb_repo_setup
 chmod +x mariadb_repo_setup
 sudo ./mariadb_repo_setup  --mariadb-server-version="mariadb-1.2.6"
 sudo apt-get install -y libmariadb3 libmariadb-dev
