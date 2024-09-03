@@ -394,10 +394,13 @@ def read_sql_table(name, con, query=None, *args, **kwargs):
             df[k] = df.apply(
                 lambda v: bool(int.from_bytes(v[k], byteorder="big")), axis=1
             )
-    else:
+    elif not "CALL" in query:
         # We also have to return the columns names in case records is []
         columns = get_field_names(con, query)
         df = DataFrameFast(columns=columns)
         df = df.astype(bit_cols)
+    else:
+        # We cannot get the columns if it was a stored procedure
+        return DataFrameFast(columns=[])
 
     return df
