@@ -203,44 +203,62 @@ class __TonyDBCOnlineOnly:
 
     def __enter__(self):
         self.log(f"Connecting to database {self.database} on {self.host}.")
-        try:
-            # DOCS:
-            # https://github.com/mariadb-corporation/mariadb-connector-python/blob/f26934540d9506b6079ad92f603b697c761622de/mariadb/mariatonydbcnection.c#L301
-            self._mariatonydbcn = mariadb.connect(
-                host=self.host,
-                user=self.user,
-                password=self.password,
-                database=self.database,
-                client_flag=MULTI_STATEMENTS,
-                autocommit=self.autocommit,
-                # connect_timeout=30,  # Default is 0, in seconds (have not yet tried this)
-                read_timeout=3600,  # 15,  # in seconds
-                write_timeout=3600,  # 20  # in seconds
-                local_infile=True,
-                compress=True,
-            )
-        except mariadb.InterfaceError as e:
-            raise Exception(
-                f"Could not connect to database. {e}\n"
-                f"Possible causes: \n"
-                f"(1) Your local Internet connection is down\n"
-                f"(2) The server {self.host} is down\n"
-                f"(3) The mariadb docker container on the server is down\n"
-                f"(4) You are using a VPN.  Disable VPN please."
-            )
-        except mariadb.OperationalError as e:
-            # e.g. mariadb.OperationalError: Can't connect to server on 'fling.ninja' (10060)
-            self.log(f"Got mariadb.OperationalError {e}")
-            if self._lost_connection_callback is not None:
-                self.log(
-                    "mariadb.OperationalError during initial connect(): "
-                    "Calling the callback provided for this situation."
+        num_attempts = MAX_RECONNECTION_ATTEMPTS
+        while True:
+            if num_attempts < MAX_RECONNECTION_ATTEMPTS:
+                l.log(
+                    f"TonyDBC.__enter__ {num_attempts} / {MAX_RECONNECTION_ATTEMPTS} remaining"
                 )
-                self._lost_connection_callback()
+            try:
+                # DOCS:
+                # https://github.com/mariadb-corporation/mariadb-connector-python/blob/f26934540d9506b6079ad92f603b697c761622de/mariadb/mariatonydbcnection.c#L301
+                self._mariatonydbcn = mariadb.connect(
+                    host=self.host,
+                    user=self.user,
+                    password=self.password,
+                    database=self.database,
+                    client_flag=MULTI_STATEMENTS,
+                    autocommit=self.autocommit,
+                    # connect_timeout=30,  # Default is 0, in seconds (have not yet tried this)
+                    read_timeout=3600,  # 15,  # in seconds
+                    write_timeout=3600,  # 20  # in seconds
+                    local_infile=True,
+                    compress=True,
+                )
+            except mariadb.InterfaceError as e:
+                if num_attempts > 0:
+                    num_attempts -= 1
+                    print(f"num_attempts {num_attempts} here")
+                    continue
 
-            raise Exception(
-                f"Database server is down?  Got mariadb.OperationalError {e}"
-            )
+                raise Exception(
+                    f"Could not connect to database. {e}\n"
+                    f"Possible causes: \n"
+                    f"(1) Your local Internet connection is down\n"
+                    f"(2) The server {self.host} is down\n"
+                    f"(3) The mariadb docker container on the server is down\n"
+                    f"(4) You are using a VPN.  Disable VPN please."
+                )
+            except mariadb.OperationalError as e:
+                # e.g. mariadb.OperationalError: Can't connect to server on 'fling.ninja' (10060)
+                self.log(f"Got mariadb.OperationalError {e}")
+
+                if num_attempts > 0:
+                    num_attempts -= 1
+                    print(f"num_attempts {num_attempts} here")
+                    continue
+
+                if self._lost_connection_callback is not None:
+                    self.log(
+                        "mariadb.OperationalError during initial connect(): "
+                        "Calling the callback provided for this situation."
+                    )
+                    self._lost_connection_callback()
+
+                raise Exception(
+                    f"Database server is down?  Got mariadb.OperationalError {e}"
+                )
+            break
 
         # If the connection fails, attempt to reconnect (cool!)
         self._mariatonydbcn.auto_reconnect = True
