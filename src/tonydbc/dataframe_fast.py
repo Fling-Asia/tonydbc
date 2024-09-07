@@ -322,55 +322,6 @@ class DataFrameFast(pd.DataFrame):
         return pd.DataFrame(r)
 
 
-def get_field_names(con, query):
-    """Use a trick to get the column names,
-    even if the result set is 0 rows.  ChatGPT told me!  Wow.
-    """
-    with con.cursor() as cursor:
-        cursor.execute(query)
-        records0 = cursor.fetchall()
-        # Get the field names
-        cursor.execute(query + " LIMIT 0")
-        columns = [v[0] for v in cursor.description]
-
-    return columns
-
-
-def get_data(con, query, return_type_codes=False):
-    with con.cursor() as cursor:
-        cursor.execute(query)
-        records0 = cursor.fetchall()
-        fields = cursor.description
-        """
-        Cursor.description is an 11-item tuple with the following:
-            name
-            type_code   can be looked up via FIELD_TYPE_DICT
-            display_size
-            internal_size
-            precision
-            scale
-            null_ok
-            field_flags
-            table_name
-            original_column_name
-            original_table_name
-        """
-
-    records = [
-        {fields[i][0]: field_value for i, field_value in enumerate(v)} for v in records0
-    ]
-
-    if return_type_codes:
-        # Get a list of dicts with proper field names
-        # (i.e. records in the pandas sense)
-        # (e.g. {'media_object_id': 'LONGLONG', 'full_path': 'VAR_STRING'}
-        type_codes = {v[0]: FIELD_TYPE_DICT[v[1]] for v in fields}
-
-        return records, type_codes
-    else:
-        return records
-
-
 def read_sql_table(name, con, query=None, *args, **kwargs):
     """A drop-in replacement for pd.read_sql_table
     Note: this does not set an index.
@@ -378,7 +329,11 @@ def read_sql_table(name, con, query=None, *args, **kwargs):
     # Just use a basic query if none was specified
     if query is None:
         query = f"SELECT * FROM {name};"
-    records, type_codes = get_data(con, query, return_type_codes=True)
+
+    # Use the main tonydbc to retrieve this with
+    records, type_codes = con.get_data(
+        query=query, no_tracking=True, return_type_codes=True
+    )
 
     # TODO: convert all cols
     pass
@@ -396,7 +351,16 @@ def read_sql_table(name, con, query=None, *args, **kwargs):
             )
     elif not "CALL" in query.upper():
         # We also have to return the columns names in case records is []
-        columns = get_field_names(con, query)
+        """Use a trick to get the column names,
+        even if the result set is 0 rows.  ChatGPT told me!  Wow.
+        """
+        with con.cursor() as cursor:
+            cursor.execute(query)
+            records0 = cursor.fetchall()
+            # Get the field names
+            cursor.execute(query + " LIMIT 0")
+            columns = [v[0] for v in cursor.description]
+
         df = DataFrameFast(columns=columns)
         df = df.astype(bit_cols)
     else:

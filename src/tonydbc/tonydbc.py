@@ -65,7 +65,12 @@ from contextlib import contextmanager
 # Use the official mariadb Python connection library
 import mariadb
 from mariadb.constants.CLIENT import MULTI_STATEMENTS
-from .dataframe_fast import DataFrameFast, read_sql_table, get_data, DATATYPE_MAP
+from .dataframe_fast import (
+    DataFrameFast,
+    read_sql_table,
+    DATATYPE_MAP,
+    FIELD_TYPE_DICT,
+)
 from .tony_utils import (
     serialize_table,
     deserialize_table,
@@ -78,9 +83,6 @@ from .env_utils import get_env_list
 from .tony_utils import prepare_scripts
 
 
-# Max number of times to re-try a command if connection is lost
-MAX_RECONNECTION_ATTEMPTS = 3
-
 # Maximum characters to output to `tony`.`query`
 QUERY_AUDIT_MAX_CHARS = 1000
 
@@ -91,6 +93,9 @@ DEFAULT_CREDENTIALS = {
     "password": "MYSQL_READWRITE_PASSWORD",
     "database": "MYSQL_DATABASE",
 }
+
+# Max number of times to re-try a command if connection is lost
+MAX_RECONNECTION_ATTEMPTS = 3
 
 
 def check_connection(fn):
@@ -576,7 +581,7 @@ class __TonyDBCOnlineOnly:
     ):
         """Read the dataframe but don't set the index"""
         full_name = ".".join([self.database, table_name])
-        df = read_sql_table(name=full_name, con=self._mariatonydbcn, query=query)
+        df = read_sql_table(name=full_name, con=self, query=query)
 
         primary_key = self.get_primary_key(table=table_name, default="id")
 
@@ -604,11 +609,82 @@ class __TonyDBCOnlineOnly:
 
         return df
 
-    def get_data(self, query: str, no_tracking=False):
+    def get_data(
+        self,
+        query: str,
+        before_retry_cmd=None,
+        no_tracking=False,
+        return_type_codes=False,
+    ):
         if self.do_audit and not no_tracking:
             started_at = self.now()
 
-        payload = get_data(self._mariatonydbcn, query=query)
+        attempts_remaining = MAX_RECONNECTION_ATTEMPTS
+        while attempts_remaining > 0:
+            with self.cursor() as cursor:
+                try:
+                    # TODO: Consider adding
+                    # cursor.execute("SET time_zone = '+00:00'")
+                    # every time though???
+                    # https://stackoverflow.com/questions/1136437/
+                    if (
+                        not before_retry_cmd is None
+                        and attempts_remaining < MAX_RECONNECTION_ATTEMPTS
+                    ):
+                        cursor.execute(before_retry_cmd)
+
+                    cursor.execute(query)
+                    records0 = cursor.fetchall()
+                    fields = cursor.description
+                    """
+                    Cursor.description is an 11-item tuple with the following:
+                        name
+                        type_code   can be looked up via FIELD_TYPE_DICT
+                        display_size
+                        internal_size
+                        precision
+                        scale
+                        null_ok
+                        field_flags
+                        table_name
+                        original_column_name
+                        original_table_name
+                    """
+                except mariadb.InterfaceError as e:
+                    self.log(
+                        f"Reconnecting to mariadb; attempting query again. "
+                        f"Attempts remaining {attempts_remaining} BEFORE this attempt."
+                    )
+                    __TonyDBCOnlineOnly.__enter__(self)
+                    attempts_remaining -= 1
+                except Exception as e:
+                    if self.interact_after_error:
+                        self.log(
+                            f"mariadb execute command failed: {query} with error {e}"
+                        )
+                        code.interact(local=locals(), banner=f"{e}")
+                    else:
+                        raise Exception(
+                            f"mariadb execute command failed: {query} with error {e}"
+                        )
+                else:
+                    # if False and cursor.lastrowid is None:
+                    #    raise AssertionError(
+                    #        f"An error occurred with one of the commands {command}; lastrowid is None"
+                    #    )
+                    break
+                cursor.execute("SHOW WARNINGS;")
+                # Check for warnings
+                warnings = cursor.fetchall()
+
+            if warnings:
+                for warning in warnings:
+                    print(warning)
+
+        records = [
+            {fields[i][0]: field_value for i, field_value in enumerate(v)}
+            for v in records0
+        ]
 
         if self.do_audit and not no_tracking:
             self._save_instrumentation(
@@ -616,10 +692,18 @@ class __TonyDBCOnlineOnly:
                 table=None,
                 query=query,
                 started_at=started_at,
-                **get_payload_info(payload),
+                **get_payload_info(records),
             )
 
-        return payload
+        if return_type_codes:
+            # Get a list of dicts with proper field names
+            # (i.e. records in the pandas sense)
+            # (e.g. {'media_object_id': 'LONGLONG', 'full_path': 'VAR_STRING'}
+            type_codes = {v[0]: FIELD_TYPE_DICT[v[1]] for v in fields}
+
+            return records, type_codes
+        else:
+            return records
 
     @property
     def databases(self):
@@ -1059,7 +1143,7 @@ class __TonyDBCOnlineOnly:
 
         cur_df = self.read_dataframe_from_table(table, cols_to_deserialize, query=query)
 
-        if self.do_audit:
+        if self.do_audit and (not query is None):
             self._save_instrumentation(
                 method=inspect.currentframe().f_code.co_name,
                 table=table,
@@ -1175,6 +1259,7 @@ class __TonyDBCOnlineOnly:
         # If we aren't just tracking exclusively in the database,
         # then write to a file please
         if self.ipath != "database":
+            print("SAVING LOCK PATH")
             lock_path = self.ipath.with_suffix(self.ipath.suffix + ".lock")
             with filelock.FileLock(lock_path) as lock:
                 try:
@@ -1394,11 +1479,22 @@ class TonyDBC(__TonyDBCOnlineOnly):
         else:
             super(TonyDBC, self).commit()
 
-    def get_data(self, query: str, no_tracking=False):
+    def get_data(
+        self,
+        query: str,
+        before_retry_cmd=None,
+        no_tracking=False,
+        return_type_codes=False,
+    ):
         if not self.is_online:
             raise AssertionError("get_data can only be used while online")
         else:
-            return super(TonyDBC, self).get_data(query=query, no_tracking=no_tracking)
+            return super(TonyDBC, self).get_data(
+                query=query,
+                before_retry_cmd=before_retry_cmd,
+                no_tracking=no_tracking,
+                return_type_codes=return_type_codes,
+            )
 
     def drop_database(self, database):
         if not self.is_online:
