@@ -348,7 +348,7 @@ class __TonyDBCOnlineOnly:
         self.log(f"TonyDBC mariadb connection closed.")
         if self.do_audit:
             self.log(f"TonyDBC debug logs at: `{self.host}`.`{self.database}`.`tony`")
-            if self.ipath != "database":
+            if str(self.ipath) != "database":
                 self.log(f"TonyDBC debug logs also at: {self.ipath}")
 
         if exit_type == SystemExit:
@@ -1236,6 +1236,8 @@ class __TonyDBCOnlineOnly:
         if not self.do_audit:
             return
 
+        assert str(self.ipath) != ""
+
         # Save in the session timezone
         started_at = started_at.tz_convert(self.session_timezone)
         completed_at = self.now()
@@ -1276,7 +1278,7 @@ class __TonyDBCOnlineOnly:
 
         # If we aren't just tracking exclusively in the database,
         # then write to a file please
-        if self.ipath != "database":
+        if str(self.ipath) != "database":
             print("SAVING LOCK PATH")
             lock_path = self.ipath.with_suffix(self.ipath.suffix + ".lock")
             with filelock.FileLock(lock_path) as lock:
@@ -1394,8 +1396,10 @@ class TonyDBC(__TonyDBCOnlineOnly):
                 self.log("Flushing database updates - DONE")
                 self.log("Backing up temp pickle")
                 shutil.move(
-                    self.__offline_pickle_path, self.__offline_pickle_path + ".BAK"
+                    str(self.__offline_pickle_path),
+                    str(self.__offline_pickle_path) + ".BAK",
                 )
+
         except AttributeError as e:
             if self.interact_after_error:
                 code.interact(banner=f"Bad TonyDBC {e}", local=locals())
@@ -1423,7 +1427,10 @@ class TonyDBC(__TonyDBCOnlineOnly):
                 f"Finished loading DB updates pickle {self.__offline_pickle_path}."
             )
             # Now get rid of the pickle so we don't use it again
-            shutil.move(self.__offline_pickle_path, self.__offline_pickle_path + ".BAK")
+            shutil.move(
+                str(self.__offline_pickle_path),
+                str(self.__offline_pickle_path) + ".BAK",
+            )
 
         for v in update_list:
             self.__update_queue.put(v)
