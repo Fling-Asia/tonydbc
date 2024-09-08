@@ -104,10 +104,7 @@ def check_connection(fn):
             self._mariatonydbcn.ping()
         except mariadb.Error:
             _ping_str = "Ping failed: Restarting mariadb connection"
-            if self._l is None:
-                print(_ping_str)
-            else:
-                self._l.info(_ping_str)
+            self.log(_ping_str)
             self.__enter__()
         result = fn(self, *args, **kwargs)
         return result
@@ -206,7 +203,7 @@ class __TonyDBCOnlineOnly:
         num_attempts = MAX_RECONNECTION_ATTEMPTS
         while True:
             if num_attempts < MAX_RECONNECTION_ATTEMPTS:
-                l.log(
+                self.log(
                     f"TonyDBC.__enter__ {num_attempts} / {MAX_RECONNECTION_ATTEMPTS} remaining"
                 )
             try:
@@ -228,7 +225,7 @@ class __TonyDBCOnlineOnly:
             except mariadb.InterfaceError as e:
                 if num_attempts > 0:
                     num_attempts -= 1
-                    print(f"num_attempts {num_attempts} here")
+                    self.log(f"num_attempts {num_attempts} here")
                     continue
 
                 raise Exception(
@@ -245,7 +242,7 @@ class __TonyDBCOnlineOnly:
 
                 if num_attempts > 0:
                     num_attempts -= 1
-                    print(f"num_attempts {num_attempts} here")
+                    self.log(f"num_attempts {num_attempts} here")
                     continue
 
                 if self._lost_connection_callback is not None:
@@ -514,7 +511,7 @@ class __TonyDBCOnlineOnly:
 
         """
         if len(df) == 0:
-            print(f"UPDATE 0 rows in {self.database}.{table_name}")
+            self.log(f"UPDATE 0 rows in {self.database}.{table_name}")
             return
 
         pk = self.get_primary_key(table=table_name, default="id")
@@ -697,7 +694,7 @@ class __TonyDBCOnlineOnly:
 
             if warnings:
                 for warning in warnings:
-                    print(warning)
+                    self.log(warning)
 
         records = [
             {fields[i][0]: field_value for i, field_value in enumerate(v)}
@@ -847,7 +844,7 @@ class __TonyDBCOnlineOnly:
 
             if warnings:
                 for warning in warnings:
-                    print(warning)
+                    self.log(warning)
 
             # mariadb.InterfaceError: Lost connection to server during query
             # mariadb.OperationalError: Can't connect to server on 'fling.ninja' (10060)
@@ -875,7 +872,7 @@ class __TonyDBCOnlineOnly:
 
         # KLUDGE
         if "DELIMITER" in script_string:
-            print(
+            self.log(
                 "Sorry, the python Mariadb connector doesn't seem to be "
                 "able to handle the DELIMITER directive.  Can you please go "
                 "to HeidiSQL or another MySQL terminal and run this script "
@@ -1279,7 +1276,7 @@ class __TonyDBCOnlineOnly:
         # If we aren't just tracking exclusively in the database,
         # then write to a file please
         if str(self.ipath) != "database":
-            print("SAVING LOCK PATH")
+            self.log("SAVING LOCK PATH")
             lock_path = self.ipath.with_suffix(self.ipath.suffix + ".lock")
             with filelock.FileLock(lock_path) as lock:
                 try:
@@ -1290,7 +1287,7 @@ class __TonyDBCOnlineOnly:
                         index=False,
                     )
                 except PermissionError as e:
-                    print(
+                    self.log(
                         f"WARNING: Instrumentation file is locked for writing: "
                         f"{self.ipath} {e}\n{payload}"
                     )
