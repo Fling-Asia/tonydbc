@@ -215,6 +215,9 @@ class DataFrameFast(pd.DataFrame):
                 """
 
             with con.cursor() as cursor:
+                # Just in case auto_reconnect reset this setting, set it again
+                cursor.execute("SET SESSION local_infile=1;")
+                # Perform the insert
                 cursor.execute(
                     cmd,
                     (tmp_filepath, FIELD_DELIMITER, ENCLOSURE_CHAR, LINE_TERMINATOR),
