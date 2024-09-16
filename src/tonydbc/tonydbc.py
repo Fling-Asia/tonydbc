@@ -258,7 +258,10 @@ class __TonyDBCOnlineOnly:
             break
 
         # If the connection fails, attempt to reconnect (cool!)
-        self._mariatonydbcn.auto_reconnect = True
+        # but sadly due to issue https://github.com/Fling-Asia/tonydbc/issues/7
+        # this will reset local_infile = False so we cannot use it.
+        # instead we rely on our lost_connection_callback to reconnect
+        self._mariatonydbcn.auto_reconnect = False
 
         if not self._mariatonydbcn.open:
             if self._lost_connection_callback is not None:
