@@ -228,7 +228,7 @@ class __TonyDBCOnlineOnly:
                     self.log(f"num_attempts {num_attempts} here")
                     continue
 
-                raise Exception(
+                raise ConnectionError(
                     f"Could not connect to database. {e}\n"
                     f"Possible causes: \n"
                     f"(1) Your local Internet connection is down\n"
@@ -252,7 +252,7 @@ class __TonyDBCOnlineOnly:
                     )
                     self._lost_connection_callback()
 
-                raise Exception(
+                raise ConnectionError(
                     f"Database server is down?  Got mariadb.OperationalError {e}"
                 )
             break
@@ -409,7 +409,9 @@ class __TonyDBCOnlineOnly:
                 )
                 self._lost_connection_callback()
 
-            raise Exception(f"Database server is down?  Got mariadb.InterfaceError {e}")
+            raise ConnectionError(
+                f"Database server is down?  Got mariadb.InterfaceError {e}"
+            )
 
         # Turn autocommit back on if that's what was originally requested
         if self.autocommit:
