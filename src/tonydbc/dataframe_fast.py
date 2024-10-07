@@ -241,10 +241,20 @@ class DataFrameFast(pd.DataFrame):
             # "1. Special values like None or column default value needs to
             #     be indicated by an indicator."
             MARIADB_NULL = mariadb.constants.INDICATOR.NULL
+
+            def int_converter(v):
+                if isinstance(v, np.int64):
+                    return int(v)
+                else:
+                    return v
+
             try:
                 table_data = [
                     tuple(
-                        [MARIADB_NULL if pd.isna(value) else value for value in sublist]
+                        [
+                            MARIADB_NULL if pd.isna(value) else int_converter(value)
+                            for value in sublist
+                        ]
                     )
                     for sublist in table_data
                 ]

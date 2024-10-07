@@ -28,17 +28,23 @@ import dateutil
 from .env_utils import get_env_bool
 
 
-def json_dumps_numpy(x):
-    # Handle numpy arrays as well as regular nested lists
-    if type(x) is np.ndarray:
-        x = x.tolist()
-
-    # When appending to the database, json.dumps will complain if this isn't a proper int
-    # so get rid of the np.int32 format here:
-    if type(x) == list:
-        x = [int(xx) if np.issubdtype(type(xx), np.integer) else xx for xx in x]
-
-    return json.dumps(x)
+# A custom encoder to handle np.int64 and other non-serializable types
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)  # Convert any numpy integer to Python int
+        if isinstance(obj, np.floating):
+            return float(obj)  # Convert any numpy float to Python float
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()  # Convert numpy arrays to Python lists
+        if isinstance(obj, list):
+            # Recursively convert numpy integers within lists
+            return [
+                int(item) if np.issubdtype(type(item), np.integer) else item
+                for item in obj
+            ]
+        # Let the base class handle other types
+        return super(NumpyEncoder, self).default(obj)
 
 
 def serialize_table(cur_df, col_dtypes, columns_to_serialize: typing.List[str]):
@@ -57,10 +63,17 @@ def serialize_table(cur_df, col_dtypes, columns_to_serialize: typing.List[str]):
     # Serialize the relevant columns from strings into nested arrays of dicts and lists
     for c in columns_to_serialize0:
         # No need to serialize into STRING 'None' anymore; mariadb connector can handle None
-        cur_df.loc[:, c] = cur_df.loc[:, [c]].apply(
-            lambda v: None if np.any(pd.isna(v[c])) else json_dumps_numpy(v[c]),
-            axis=1,
-        )
+        try:
+            cur_df.loc[:, c] = cur_df.loc[:, [c]].apply(
+                lambda v: (
+                    None
+                    if np.any(pd.isna(v[c]))
+                    else json.dumps(v[c], cls=NumpyEncoder)
+                ),
+                axis=1,
+            )
+        except TypeError as e:
+            raise TypeError(f"Column {c} could not be serialized; {e}")
 
     # Serialization approach #1 (older): cast int and also float.
     # We don't do ndarray anymore.  (we just use lists of lists and we do that with approach 2 below)
