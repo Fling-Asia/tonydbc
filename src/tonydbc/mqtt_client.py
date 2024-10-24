@@ -34,7 +34,7 @@ class MQTTClient:
         # NOTE: clean_session=False means it will be a "durable client";
         #       that is, messages will be saved if the client disconnects
         self.__mqtt_client = mqtt.Client(
-            client_id=self.MQTTClient_id, clean_session=False
+            client_id=self.MQTTClient_id, clean_session=False, reconnect_on_failure=True
         )
 
         # Attach callback functions
@@ -47,10 +47,7 @@ class MQTTClient:
         )
 
         # Connect to MQTT broker
-        self.__mqtt_client.connect(
-            self.MQTT_host,
-            port=self.MQTT_port,
-        )
+        self.__mqtt_client.connect(self.MQTT_host, port=self.MQTT_port, keepalive=30)
 
         return self
 
