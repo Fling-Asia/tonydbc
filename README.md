@@ -1,6 +1,6 @@
 # TonyDBC
 
-Latest version: 1.2.13
+Latest version: 1.2.14
 
 Available on PyPI: https://pypi.org/project/tonydbc/
 
@@ -41,7 +41,7 @@ sudo apt-get install -y wget curl python3-packaging gcc
 # See https://mariadb.com/docs/skysql/connect/programming-languages/c/install/#Installation_via_Package_Repository_(Linux)
 wget https://r.mariadb.com/downloads/mariadb_repo_setup || wget https://downloads.mariadb.com/MariaDB/mariadb_repo_setup
 chmod +x mariadb_repo_setup
-sudo ./mariadb_repo_setup  --mariadb-server-version="mariadb-1.2.13"
+sudo ./mariadb_repo_setup  --mariadb-server-version="mariadb-1.2.14"
 sudo apt-get install -y libmariadb3 libmariadb-dev
 
 pip3 install tonydbc
