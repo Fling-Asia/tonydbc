@@ -66,29 +66,41 @@ class MQTTClient:
 
     def publish(self, topic, message):
         if not self.__mqtt_client.is_connected():
-            print("MQTT client not connected. Attempting to reconnect.")
+            print(
+                f"Attempting publish on topic {topic} but MQTT client not connected; Attempting to reconnect."
+            )
             try:
                 self.__mqtt_client.reconnect()
             except Exception as e:
-                print(f"Failed to reconnect: {e}")
+                print(
+                    f"Failed to reconnect during attempt to publish on topic {topic}: {e}"
+                )
                 return  # Exit the method if reconnection fails
 
         # Publish the message
         res = self.__mqtt_client.publish(topic, message)
         if res.rc != mqtt.MQTT_ERR_SUCCESS:
-            print(f"MQTT Publish failed with rc={res.rc}. Attempting to reconnect.")
+            print(
+                f"MQTT publish on topic {topic} failed with rc={res.rc}. Attempting to reconnect."
+            )
             try:
                 self.__mqtt_client.reconnect()
                 # Try publishing again
                 res = self.__mqtt_client.publish(topic, message)
                 if res.rc != mqtt.MQTT_ERR_SUCCESS:
-                    print(f"MQTT Publish failed again after reconnecting. rc={res.rc}")
+                    print(
+                        f"MQTT publish on topic {topic} failed again after reconnecting. rc={res.rc}"
+                    )
                 else:
-                    print("MQTT Publish succeeded after reconnecting.")
+                    print(
+                        f"MQTT publish on topic {topic} succeeded after reconnecting."
+                    )
             except Exception as e:
-                print(f"MQTT Reconnect failed: {e}")
+                print(
+                    f"MQTT reconnect while trying to publish on topic {topic} failed: {e}"
+                )
         else:
-            print("MQTT Publish succeeded.")
+            print(f"MQTT publish on topic {topic} succeeded.")
 
     def on_connect(self, client, userdata, flags, rc):
         # The callback for when the client receives a
@@ -110,6 +122,8 @@ class MQTTClient:
                 client.reconnect()
             except Exception as e:
                 print(f"Reconnect failed: {e}")
+            else:
+                print(f"Reconnect after disconnection rc={rc} succeeded.")
 
     def on_message(self, client, userdata, message):
         """Receive MQTT message
