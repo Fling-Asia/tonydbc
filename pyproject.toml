@@ -59,7 +59,7 @@ push = true
     'version = "{version}"'
 ]
 "README.md" = [
-    "{version}"
+    'Latest version: "{version}"'
 ]
 "src/tonydbc/__init__.py" = [
     '__version__ = "{version}"'
