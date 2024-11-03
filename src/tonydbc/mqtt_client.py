@@ -1,8 +1,14 @@
 import os
 import sys
 import json
+import time
 import datetime
 from paho.mqtt import client as mqtt
+import uuid
+
+MAX_RECONNECT_ATTEMPTS = 10
+
+RECONNECT_ON_FAILURE = True
 
 
 class MQTTClient:
@@ -10,19 +16,19 @@ class MQTTClient:
 
     def __init__(
         self,
-        host,
-        user,
-        password,
+        host: str,
+        user: str,
+        password: str,
         subscribed_topics,
-        client_id="MQTTClient_name",
-        port=1883,
+        client_id: str = "MQTTClient_name",
+        port: int = 1883,
     ):
         self.MQTT_host = host
         self.MQTT_user = user
         self.MQTT_password = password
         self.MQTT_port = int(port)
         self.MQTT_subscribed_topics = subscribed_topics
-        self.MQTTClient_id = client_id
+        self.MQTTClient_id = f"{str(client_id)}_{str(uuid.uuid4())[:4]}"
 
         assert len(self.MQTT_subscribed_topics) > 0
 
@@ -34,7 +40,9 @@ class MQTTClient:
         # NOTE: clean_session=False means it will be a "durable client";
         #       that is, messages will be saved if the client disconnects
         self.__mqtt_client = mqtt.Client(
-            client_id=self.MQTTClient_id, clean_session=False, reconnect_on_failure=True
+            client_id=self.MQTTClient_id,
+            clean_session=False,
+            reconnect_on_failure=RECONNECT_ON_FAILURE,
         )
 
         # Attach callback functions
@@ -65,65 +73,41 @@ class MQTTClient:
         self.__mqtt_client.loop_forever()
 
     def publish(self, topic, message):
-        if not self.__mqtt_client.is_connected():
-            print(
-                f"Attempting publish on topic {topic} but MQTT client not connected; Attempting to reconnect."
-            )
-            try:
-                self.__mqtt_client.reconnect()
-            except Exception as e:
-                print(
-                    f"Failed to reconnect during attempt to publish on topic {topic}: {e}"
-                )
-                return  # Exit the method if reconnection fails
+        print(f"Attempting publish on topic {topic}")
 
         # Publish the message
         res = self.__mqtt_client.publish(topic, message)
-        if res.rc != mqtt.MQTT_ERR_SUCCESS:
-            print(
-                f"MQTT publish on topic {topic} failed with rc={res.rc}. Attempting to reconnect."
-            )
-            try:
-                self.__mqtt_client.reconnect()
-                # Try publishing again
-                res = self.__mqtt_client.publish(topic, message)
-                if res.rc != mqtt.MQTT_ERR_SUCCESS:
-                    print(
-                        f"MQTT publish on topic {topic} failed again after reconnecting. rc={res.rc}"
-                    )
-                else:
-                    print(
-                        f"MQTT publish on topic {topic} succeeded after reconnecting."
-                    )
-            except Exception as e:
-                print(
-                    f"MQTT reconnect while trying to publish on topic {topic} failed: {e}"
-                )
-        else:
+        if res.rc == mqtt.MQTT_ERR_SUCCESS:
             print(f"MQTT publish on topic {topic} succeeded.")
+        else:
+            raise IOError(f"MQTT publish on topic {topic} failed with rc={res.rc}.")
 
     def on_connect(self, client, userdata, flags, rc):
         # The callback for when the client receives a
         # CONNACK ("Connection Acknowledge") response from the server.
-        msg = f"{str(self.now_utc)} | {self.MQTTClient_id} | INFO | Connecting to MQTT server: "
-        if rc == 0:
-            print(msg + "success")
+        msg = f"{str(self.now_utc)} | {self.MQTTClient_id} | INFO | Connected to MQTT server: "
+        if rc != mqtt.MQTT_ERR_SUCCESS:
+            raise IOError(msg + f"failed with rc={rc}")
 
-            # Subscribe to topics AFTER a successful connection (or reconnection)
-            for topic in self.MQTT_subscribed_topics:
-                self.__mqtt_client.subscribe(topic)
-        else:
-            raise AssertionError(msg + "failed")
+        print(msg + "success")
+
+        # Subscribe to topics AFTER a successful connection (or reconnection)
+        for topic in self.MQTT_subscribed_topics:
+            self.__mqtt_client.subscribe(topic)
 
     def on_disconnect(self, client, userdata, rc):
+        assert client == self.__mqtt_client
+        if rc == mqtt.MQTT_ERR_SUCCESS:
+            print(f"Disconnection (expected) of with rc = mqtt.MQTT_ERR_SUCCESS.")
         if rc != 0:
-            print(f"Unexpected disconnection. rc={rc}. Attempting to reconnect.")
-            try:
-                client.reconnect()
-            except Exception as e:
-                print(f"Reconnect failed: {e}")
+            if not RECONNECT_ON_FAILURE:
+                raise IOError(
+                    f"Unexpected disconnection rc={rc}.  Not reconnecting manually since RECONNECT_ON_FAILURE=True"
+                )
             else:
-                print(f"Reconnect after disconnection rc={rc} succeeded.")
+                print(
+                    f"Unexpected disconnection rc={rc}.  Hopefully reconnection will occur automatically."
+                )
 
     def on_message(self, client, userdata, message):
         """Receive MQTT message
