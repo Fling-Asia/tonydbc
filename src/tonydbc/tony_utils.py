@@ -142,7 +142,7 @@ def deserialize_table(
                 )
                 return np.nan
 
-                cur_df.loc[:, [c]] = cur_df.loc[:, [c]].apply(json_loads, axis=1)
+        cur_df.loc[:, [c]] = cur_df.loc[:, [c]].apply(json_loads, axis=1)
 
     # CONVERT all pd.Timestamp objects (which have been provided by mariadb
     # in the session timezone anyway)
