@@ -128,23 +128,21 @@ def deserialize_table(
             else:
                 raise KeyError(e)
 
-        try:
-            cur_df.loc[:, [c]] = cur_df.loc[:, [c]].apply(
-                lambda v: json.loads(v[c]) if v[c] not in ["nan", "None"] else np.nan,
-                axis=1,
-            )
-        except TypeError as e:
-            if get_env_bool("INTERACT_AFTER_ERROR"):
-                print(f"tonydbc.deserialize_table ERROR {e}")
-                code.interact(local=locals(), banner=f"{e}")
-            else:
-                raise TypeError(e)
-        except json.decoder.JSONDecodeError as e:
-            if get_env_bool("INTERACT_AFTER_ERROR"):
-                print(f"tonydbc.deserialize_table ERROR {e}")
-                code.interact(local=locals(), banner=f"{e}")
-            else:
-                raise json.decoder.JSONDecodeError(e)
+        def json_loads(v):
+            try:
+                return json.loads(v[c]) if v[c] not in ["nan", "None"] else np.nan
+            except json.decoder.JSONDecodeError as e:
+                print(
+                    f"tonydbc.deserialize_table JSON DECODE ERROR: column {c} row {v.name}: {v[c]}: {e}"
+                )
+                return np.nan
+            except TypeError as e:
+                print(
+                    f"tonydbc.deserialize_table ERROR: column {c} row {v.name}: {v[c]}: {e}"
+                )
+                return np.nan
+
+                cur_df.loc[:, [c]] = cur_df.loc[:, [c]].apply(json_loads, axis=1)
 
     # CONVERT all pd.Timestamp objects (which have been provided by mariadb
     # in the session timezone anyway)
