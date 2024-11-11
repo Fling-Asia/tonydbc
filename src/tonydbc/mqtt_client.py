@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import time
+import socket
 import datetime
 from paho.mqtt import client as mqtt
 import uuid
@@ -90,6 +91,12 @@ class MQTTClient:
             raise IOError(msg + f"failed with rc={rc}")
 
         print(msg + "success")
+
+        sock = client.socket()
+        if sock:
+            # Increase the send and receive buffer sizes
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 1048576)  # 1 MB
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1048576)  # 1 MB
 
         # Subscribe to topics AFTER a successful connection (or reconnection)
         for topic in self.MQTT_subscribed_topics:
