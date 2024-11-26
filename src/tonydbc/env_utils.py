@@ -152,10 +152,14 @@ def check_environment_variable_integrity(env_filepath):
 def get_env_bool(key):
     """Handles the case of a boolean environment variable"""
     if not key in os.environ:
-        raise KeyError(f"No environment variable {key}")
+        raise KeyError(f"No environment variable '{key}' was found.")
 
     if not os.environ[key] in ("True", "False"):
-        raise AssertionError(f"Key {key} is not proper boolean: {os.environ[key]}")
+        raise AssertionError(
+            f"Environment variable '{key}' is recorded "
+            f"as '{os.environ[key]}', which is not a proper boolean. "
+            "It must be either 'True' or 'False'."
+        )
 
     return os.environ[key] == "True"
 
