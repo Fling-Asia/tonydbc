@@ -50,6 +50,7 @@ import inspect
 import tzlocal
 import typing
 import pickle
+import threading
 import numpy as np
 import pandas as pd
 import datetime
@@ -795,10 +796,33 @@ class __TonyDBCOnlineOnly:
         command_values=None,
         before_retry_cmd=None,
         no_tracking=False,
+        log_progress=False,
     ):
         """Parameters:
         command_values: a tuple of values [optional]
         """
+        if log_progress:
+            self.log(f"Executing {command[:50]}")
+
+            stop_wait_message = (
+                threading.Event()
+            )  # Event to signal the waiting thread to stop
+
+            def wait_message():
+                log_increment = 0
+                while not stop_wait_message.is_set():
+                    if log_increment >= 50:
+                        # Every 50 x 0.1s = 5s, we will notify that the query is still going...
+                        self.log(f"Waiting for {command[:50]} ...")
+                        log_increment = 0
+                    # Sleep for only a short time to avoid slowing things down when we .join
+                    # if the query ends early
+                    time.sleep(0.1)
+                    log_increment += 1
+
+            wait_thread = threading.Thread(target=wait_message, daemon=True)
+            wait_thread.start()
+
         if self.do_audit and not no_tracking:
             started_at = self.now()
 
@@ -836,6 +860,9 @@ class __TonyDBCOnlineOnly:
                         )
                         code.interact(local=locals(), banner=f"{e}")
                     else:
+                        if log_progress:
+                            stop_wait_message.set()
+                            wait_thread.join()
                         raise Exception(e)
                 else:
                     # if False and cursor.lastrowid is None:
@@ -854,6 +881,12 @@ class __TonyDBCOnlineOnly:
             # mariadb.InterfaceError: Lost connection to server during query
             # mariadb.OperationalError: Can't connect to server on 'fling.ninja' (10060)
             # mariadb.InterfaceError: Server has gone away
+
+        # Signal the waiting thread to stop
+        if log_progress:
+            stop_wait_message.set()
+            wait_thread.join()
+            l.info(f"Executing {command[:50]} - DONE")
 
         if self.do_audit and not no_tracking:
             self._save_instrumentation(
