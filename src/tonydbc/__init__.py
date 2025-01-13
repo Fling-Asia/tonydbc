@@ -36,7 +36,6 @@ from .env_utils import get_env_bool, get_env_list, load_dotenvs
 from .tony_utils import (
     set_MYSQL_DATABASE,
     get_current_time,
-    get_current_time_string,
     deserialize_table,
     list_to_SQL,
     list_to_SQL2,

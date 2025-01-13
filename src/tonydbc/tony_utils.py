@@ -4,7 +4,6 @@ Support utilities for TonyDBC:
     serialize_table
     deserialize_table
     get_current_time
-    get_current_time_string
     set_MYSQL_DATABASE
     iso_timestamp_to_utc
     get_tz_offset

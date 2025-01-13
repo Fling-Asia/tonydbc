@@ -75,7 +75,6 @@ from .dataframe_fast import (
 from .tony_utils import (
     serialize_table,
     deserialize_table,
-    get_current_time_string,
     get_tz_offset,
     get_payload_info,
     get_next_word_after_from,
@@ -1214,14 +1213,14 @@ class __TonyDBCOnlineOnly:
         cur_df = self.query_table(table)
         setattr(self, f"{table}_df", cur_df)
 
-    def log_to_db(self, log: dict):
+    def log_to_db(self, log_dict: dict):
         """Save log to database
         This module will get the dictionary of log to print put and add
         to the database 'server_log' table. ALL of the keys need past
         to the function with db_credentials. Dictionary format :
             log_message = {
                 'log_module' : log_module,
-                'log_state' : "STARTED/ERROR/INFO/WARNING/COMPLETED,
+                'log_state' : "STARTED/ERROR/INFO/WARNING/COMPLETED/NOTIFY,
                 'log_event' : 'event of the log or action',
                 'log_message' : "log message",
                 'log_hostname' : hostname
@@ -1236,18 +1235,16 @@ class __TonyDBCOnlineOnly:
             "log_message",
             "log_hostname",
         ]
-        if all(k in log_template for k in log):
-            with self.cursor() as cursor:
-                log["saveTime"] = get_current_time_string()
-                query = f"""
-                    INSERT INTO server_log (module,state,log_event,message,saveTime,_host)
-                    VALUES ('{str(log['log_module'])}','{str(log['log_state'])}','{str(log['log_event'])}','{str(log['log_message'])}','{log['saveTime']}','{str(log['log_hostname'])}');
-                """
-                query = query.replace("'None'", "null")
-                record = cursor.execute(query)
-                self.log(
-                    f"{log['saveTime']}| {log['log_state']} | {log['log_module']} : {log['log_event']} {log['log_message']} {log['log_hostname']}"
-                )
+        if all(k in log_template for k in log_dict):
+            query = f"""
+                INSERT INTO server_log (`module`, `state`, `log_event`, `message`, `_host`)
+                VALUES ('{str(log['log_module'])}','{str(log['log_state'])}','{str(log['log_event'])}','{str(log['log_message'])}','{str(log['log_hostname'])}');
+            """
+            query = query.replace("'None'", "null")
+            self.execute(query)
+            self.log(
+                f"{log['log_state']} | {log['log_module']} : {log['log_event']} {log['log_message']} {log['log_hostname']}"
+            )
         else:
             if "log_module" in log.keys():
                 failed_module = str(log["log_module"])
