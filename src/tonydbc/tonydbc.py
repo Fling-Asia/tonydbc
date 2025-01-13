@@ -885,7 +885,7 @@ class __TonyDBCOnlineOnly:
         if log_progress:
             stop_wait_message.set()
             wait_thread.join()
-            l.info(f"Executing {command[:50]} - DONE")
+            self.log(f"Executing {command[:50]} - DONE")
 
         if self.do_audit and not no_tracking:
             self._save_instrumentation(
@@ -1627,12 +1627,14 @@ class TonyDBC(__TonyDBCOnlineOnly):
         command_values=None,
         before_retry_cmd=None,
         no_tracking=False,
+        log_progress=False,
     ):
         kwargs = {
             "command": command,
             "command_values": command_values,
             "before_retry_cmd": before_retry_cmd,
             "no_tracking": no_tracking,
+            "log_progress": log_progress,
         }
         if self.is_online:
             super(TonyDBC, self).execute(**kwargs)
