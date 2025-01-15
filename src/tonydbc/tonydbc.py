@@ -1239,16 +1239,16 @@ class __TonyDBCOnlineOnly:
         if all(k in log_template for k in log_dict):
             query = f"""
                 INSERT INTO server_log (`module`, `state`, `log_event`, `message`, `_host`)
-                VALUES ('{str(log['log_module'])}','{str(log['log_state'])}','{str(log['log_event'])}','{str(log['log_message'])}','{str(log['log_hostname'])}');
+                VALUES ('{str(log_dict['log_module'])}','{str(log_dict['log_state'])}','{str(log_dict['log_event'])}','{str(log_dict['log_message'])}','{str(log_dict['log_hostname'])}');
             """
             query = query.replace("'None'", "null")
             self.execute(query)
             self.log(
-                f"{log['log_state']} | {log['log_module']} : {log['log_event']} {log['log_message']} {log['log_hostname']}"
+                f"{log_dict['log_state']} | {log_dict['log_module']} : {log_dict['log_event']} {log_dict['log_message']} {log_dict['log_hostname']}"
             )
         else:
             if "log_module" in log.keys():
-                failed_module = str(log["log_module"])
+                failed_module = str(log_dict["log_module"])
             else:
                 failed_module = "unknown"
             self.log(
