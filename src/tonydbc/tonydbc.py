@@ -1682,8 +1682,8 @@ class TonyDBC(__TonyDBCOnlineOnly):
                 )
             self.__update_queue.put(("append_to_table", kwargs))
 
-    def log_to_db(self, log: dict):
-        kwargs = {"log": log}
+    def log_to_db(self, log_dict: dict):
+        kwargs = {"log_dict": log_dict}
         if self.is_online:
             super(TonyDBC, self).log_to_db(**kwargs)
         else:
