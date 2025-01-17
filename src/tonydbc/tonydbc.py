@@ -470,7 +470,7 @@ class __TonyDBCOnlineOnly:
         # Make new connections
         self.__enter__()
 
-    def iso_timestamp_to_session_time_zone(self, iso_timestamp_string):
+    def iso_timestamp_to_session_time_zone(self, iso_timestamp_string: str):
         """e.g. converts an ISO-formatted string to the database session's time zone,
         self.default_tz, which is useful when adding to a mariadb TIMESTAMP
         which assumes the time is formatted as the session time zone.
