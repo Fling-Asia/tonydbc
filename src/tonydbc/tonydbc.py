@@ -491,7 +491,7 @@ class __TonyDBCOnlineOnly:
             raise ValueError(f"Timestamp '{iso_timestamp_string}' is invalid. {e}")
         else:
             iso_ts = ts.astimezone(self.default_tz)  # dateutil.tz.UTC
-            return iso_ts.strftime("%Y-%m-%d %H:%M:%S")
+            return iso_ts.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
 
     def write_dataframe(self, df, table_name, if_exists="replace", index=False):
         """Write all rows of a dataframe to the database
