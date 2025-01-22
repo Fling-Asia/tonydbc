@@ -172,11 +172,7 @@ class __TonyDBCOnlineOnly:
         self.session_uuid = str(uuid6.uuid8())
         self.port = port
         self.media_to_deserialize = media_to_deserialize
-
         self.autocommit = autocommit
-        self._in_transaction = False
-        self._prev_autocommit = self.autocommit
-
         self._l = l
         self._lost_connection_callback = lost_connection_callback
         self.using_temp_conn = False
@@ -397,22 +393,10 @@ class __TonyDBCOnlineOnly:
     def begin_transaction(self):
         """This must be followed by a commit later.  Turns off autocommit."""
         # We must ensure autocommit is not on to be able to create a transaction
-        if self._in_transaction:
-            raise AssertionError(
-                "We are already in a transaction; no need to begin again."
-            )
-
-        self._in_transaction = True
-        self._prev_autocommit = self.autocommit
-        self.autocommit = False
-
-        if self._prev_autocommit:
-            # We need to restart the connection with the new setting; if autocommit was True
-            self.__enter__()
-            # self.execute("SET AUTOCOMMIT=0;")
+        if self.autocommit:
+            self.execute("SET AUTOCOMMIT=0;")
 
         self._mariatonydbcn.begin()
-        self.log("BEGIN transaction")
 
     def commit(self):
         try:
@@ -430,16 +414,9 @@ class __TonyDBCOnlineOnly:
                 f"Database server is down?  Got mariadb.InterfaceError {e}"
             )
 
-        if self._in_transaction:
-            self._in_transaction = False
-
-            if self._prev_autocommit != self.autocommit:
-                self.autocommit = self._prev_autocommit
-                l.log(
-                    f"Resetting DB connection after commit to autocommit = {self.autocommit}"
-                )
-                self.__enter__()
-                # self.execute("SET AUTOCOMMIT=1;")
+        # Turn autocommit back on if that's what was originally requested
+        if self.autocommit:
+            self.execute("SET AUTOCOMMIT=1;")
 
     def log(self, msg: str):
         """Internal logging; use normal print if a logger was not provided"""
