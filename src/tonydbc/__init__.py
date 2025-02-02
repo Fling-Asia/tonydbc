@@ -27,7 +27,7 @@ e.g.
 
 """
 
-__version__ = "1.2.24"
+__version__ = "1.2.25"
 
 # Include vanialla dotenv.load_dotenv to be comprehensive, but it's not really needed
 # since the version people should use is load_dotenvs
