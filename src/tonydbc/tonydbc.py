@@ -113,7 +113,7 @@ def check_connection(fn):
     return conn_wrapper
 
 
-class __TonyDBCOnlineOnly:
+class _TonyDBCOnlineOnly:
     """
     Generic context manager for a database connection and for several
     common queries and commands made against a database.
@@ -200,6 +200,9 @@ class __TonyDBCOnlineOnly:
                     self.ipath.unlink()
 
     def __enter__(self):
+        self.make_connection()
+
+    def make_connection(self):
         self.log(f"Connecting to database {self.database} on {self.host}.")
         num_attempts = MAX_RECONNECTION_ATTEMPTS
         while True:
@@ -676,7 +679,7 @@ class __TonyDBCOnlineOnly:
                         f"Reconnecting to mariadb; attempting query again. "
                         f"Attempts remaining {attempts_remaining} BEFORE this attempt."
                     )
-                    __TonyDBCOnlineOnly.__enter__(self)
+                    self.make_connection()
                     attempts_remaining -= 1
                 except Exception as e:
                     if self.interact_after_error:
@@ -851,7 +854,7 @@ class __TonyDBCOnlineOnly:
                         f"Reconnecting to mariadb; attempting command {command} again. "
                         f"Attempts remaining {attempts_remaining} BEFORE this attempt."
                     )
-                    __TonyDBCOnlineOnly.__enter__(self)
+                    self.make_connection()
                     attempts_remaining -= 1
                 except Exception as e:
                     if self.interact_after_error:
@@ -1352,7 +1355,7 @@ class __TonyDBCOnlineOnly:
 # -----------------------------------------------------------------------------------
 
 
-class TonyDBC(__TonyDBCOnlineOnly):
+class TonyDBC(_TonyDBCOnlineOnly):
     """Public exposed class offering all base functions plus an offline mode
 
     Note: this is not a true offline mode; it still needs to be in online mode at the beginning, and end.
