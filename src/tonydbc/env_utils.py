@@ -234,10 +234,10 @@ def load_dotenvs():
     # Also, the .env file in the script's path, if any
     base_env_path = os.path.join(sys.path[0], ".env")
     if os.path.isfile(base_env_path):
-        print(f"LOADING BASE ENV {base_env_path}")
+        print(f"load_dotenvs: loading base env {base_env_path}")
         dotenv.load_dotenv(base_env_path, override=True)
     else:
-        print(f"WARNING: base env {base_env_path} .env file does not exist.")
+        print(f"load_dotenvs: WARNING: base env {base_env_path} .env file does not exist.")
 
     if "DOT_ENVS" in os.environ:
         # Get every .env we are supposed to load
@@ -245,11 +245,11 @@ def load_dotenvs():
     elif os.path.isfile(base_env_path):
         env_paths_raw = [base_env_path]
         print(
-            f"WARNING: No `DOT_ENVS` in os.environ, "
+            f"load_dotenvs: WARNING: No `DOT_ENVS` in os.environ, "
             f"so defaulting to `DOT_ENVS` = {env_paths_raw}"
         )
     else:
-        print(f"WARNING: No `DOT_ENVS` in os.environ, and no base env file.")
+        print(f"load_dotenvs: WARNING: No `DOT_ENVS` in os.environ, and no base env file.")
         env_paths_raw = []
 
     # In some contexts, like docker on the server, it's impractical
@@ -265,18 +265,20 @@ def load_dotenvs():
     # Resolve the path to remove any pesky ".."s
     env_paths = [str(pathlib.Path(p).resolve()) for p in env_paths]
 
-    env_paths_str = "\n".join(env_paths)
-    print(f"`DOT_ENVS` are:\n{env_paths_str}")
+    # This is too verbose:
+    #env_paths_str = "\n".join(env_paths)
+    #print(f"`DOT_ENVS` are:\n{env_paths_str}")
 
     # Load and check these files against their .env.example files for omissions
     for env_path in env_paths:
         if not os.path.isfile(env_path):
-            print(f"WARNING: env path {env_path} does not exist")
+            print(f"load_dotenvs: WARNING: env path {env_path} does not exist")
             continue
-        print(f"LOADING env_path {env_path}")
+        print(f"load_dotenvs: loading env_path {env_path}")
         dotenv.load_dotenv(env_path, override=True)
         if do_check:
-            print(f"CHECKING env_path {env_path}")
+            # This is too verbose:
+            # print(f"load_dotenvs: checking env_path {env_path}")
             # Check environment variables are consistent between .env and .env.example
             check_environment_variable_integrity(env_path)
 
