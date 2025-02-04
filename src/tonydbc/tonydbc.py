@@ -697,9 +697,15 @@ class _TonyDBCOnlineOnly:
                     #        f"An error occurred with one of the commands {command}; lastrowid is None"
                     #    )
                     break
-                cursor.execute("SHOW WARNINGS;")
-                # Check for warnings
-                warnings = cursor.fetchall()
+                try:
+                    cursor.execute("SHOW WARNINGS;")
+                except mariadb.InterfaceError as e:
+                    self.log(
+                        f"Cannot run cursor.execute('SHOW WARNINGS;') because mariadb.InterfaceError {e}.")
+                    warnings = []
+                else:
+                    # Check for warnings
+                    warnings = cursor.fetchall()
 
             if warnings:
                 for warning in warnings:
