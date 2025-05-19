@@ -1,10 +1,8 @@
-import os
-import sys
-import json
-import time
 import datetime
-from paho.mqtt import client as mqtt
+import json
 import uuid
+
+from paho.mqtt import client as mqtt
 
 MAX_RECONNECT_ATTEMPTS = 10
 
@@ -72,13 +70,12 @@ class MQTTClient:
         """
         self.__mqtt_client.loop_forever()
 
-    def publish(self, topic, message):
-        print(f"Attempting publish on topic {topic}")
-
+    def publish(self, topic, message, verbose=False):
         # Publish the message
         res = self.__mqtt_client.publish(topic, message)
         if res.rc == mqtt.MQTT_ERR_SUCCESS:
-            print(f"MQTT publish on topic {topic} succeeded.")
+            if verbose:
+                print(f"MQTT publish on topic {topic} succeeded.")
         else:
             raise IOError(f"MQTT publish on topic {topic} failed with rc={res.rc}.")
 
