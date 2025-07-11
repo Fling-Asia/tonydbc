@@ -77,3 +77,22 @@ with TonyDBC(**sql_params) as db:
 
     print(contoso_users_df.first_name)
 ```
+
+## Timezone Handling in TonyDBC
+
+Internally, MariaDB stores timestamps in UTC and its insert and select return timestamps in the session timezone for that database connection session.
+
+`db = TonyDBC()` follows the same convention as MariaDB, and tracks timezone as `db.session_timezone`.
+
+This `db.session_timezone` is set initially by:
+
+1. In the `db = TonyDBC(session_timezone="Asia/Bangkok")` initializer via the parameter `session_timezone`, which defaults to None.
+2. If None is specified, it will be taken from the `DEFAULT_TIMEZONE` environment variable; e.g. `DEFAULT_TIMEZONE=Asia/Bangkok`.
+
+Note: If NEITHER of the above is specified, an AssertionError will be raised during initialization.
+
+3. Later, you can call `db.set_timezone("Asia/Bangkok")` to set the timezone to something else.
+
+As with MariaDB commands, all insert and select statements in TonyDBC will return timestamps in the session timezone.
+
+''Note that TonyDBC will warn if the session timezone is not the same as the system timezone.''
