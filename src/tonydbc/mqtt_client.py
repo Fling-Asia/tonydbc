@@ -121,7 +121,7 @@ class MQTTClient:
 
         res_message = {
             "timestamp": self.now_utc_string,
-            "topic": topic,
+            "topic": message.topic,
             "message": message_payload,
         }
 

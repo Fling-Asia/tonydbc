@@ -128,7 +128,7 @@ class _TonyDBCOnlineOnly:
         port=3306,
         media_to_deserialize=[],
         autocommit=True,
-        l=None,
+        logger_instance=None,
         prefix="",
         lost_connection_callback=None,
         session_timezone=None,
@@ -167,7 +167,7 @@ class _TonyDBCOnlineOnly:
         self.port = port
         self.media_to_deserialize = media_to_deserialize
         self.autocommit = autocommit
-        self._l = l
+        self._l = logger_instance
         self._lost_connection_callback = lost_connection_callback
         self.using_temp_conn = False
         self.interact_after_error = interact_after_error
@@ -380,7 +380,7 @@ class _TonyDBCOnlineOnly:
             if str(self.ipath) != "database":
                 self.log(f"TonyDBC debug logs also at: {self.ipath}")
 
-        if exit_type == SystemExit:
+        if isinstance(exit_type, type(SystemExit)):
             self.log("TonyDBC: user typed exit() in interpreter.")
         elif exit_type is not None:
             self.log(
@@ -1277,7 +1277,7 @@ class _TonyDBCOnlineOnly:
                 f"{log_dict['log_state']} | {log_dict['log_module']} : {log_dict['log_event']} {log_dict['log_message']} {log_dict['log_hostname']}"
             )
         else:
-            if "log_module" in log.keys():
+            if "log_module" in log_dict.keys():
                 failed_module = str(log_dict["log_module"])
             else:
                 failed_module = "unknown"
@@ -1344,7 +1344,7 @@ class _TonyDBCOnlineOnly:
         if str(self.ipath) != "database":
             self.log("SAVING LOCK PATH")
             lock_path = self.ipath.with_suffix(self.ipath.suffix + ".lock")
-            with filelock.FileLock(lock_path) as lock:
+            with filelock.FileLock(lock_path):
                 try:
                     df.to_csv(
                         self.ipath,
@@ -1443,7 +1443,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
     @is_online.setter
     def is_online(self, value: bool):
         """If the user sets is_online to True, and it was not before, then flush updates."""
-        assert type(value) == bool
+        assert isinstance(value, bool)
         if self.__offline_status == "offline" and value:
             self.__offline_status = "flushing"
             self.flush_updates()

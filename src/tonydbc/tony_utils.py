@@ -80,7 +80,7 @@ def serialize_table(cur_df, col_dtypes, columns_to_serialize: typing.List[str]):
     int_cols = [
         col
         for col, dt in dict(col_dtypes).items()
-        if dt == int and col in cur_df.columns
+        if dt is int and col in cur_df.columns
     ]
     # Columns with NaN can't be cast to int so let's first change NaN to -1
     cur_df[int_cols] = cur_df[int_cols].fillna(-1)
@@ -93,7 +93,7 @@ def serialize_table(cur_df, col_dtypes, columns_to_serialize: typing.List[str]):
             {
                 col: dt
                 for col, dt in dict(col_dtypes).items()
-                if dt != np.ndarray and dt != str and col in cur_df.columns
+                if dt != np.ndarray and dt is not str and col in cur_df.columns
             }
         )
     except ValueError:
@@ -151,7 +151,7 @@ def deserialize_table(
             cur_df[c] = cur_df.apply(
                 lambda v: v[c].tz_localize(session_timezone), axis=1
             )
-        elif cur_df[c].dtype.type == str and c.endswith("_at") or c == "timestamp":
+        elif isinstance(cur_df[c].dtype.type(), str) and (c.endswith("_at") or c == "timestamp"):
             # Try our best to do it to any other field such as DATETIME entries which
             # were not already set to pd.Timestamp objects
             # (note that this assumes the DATETIME entries are in our session timezone)
@@ -198,7 +198,7 @@ def iso_timestamp_to_utc(
     try:
         ts = dateutil.parser.parse(iso_timestamp_string)
     except dateutil.parser._parser.ParserError as e:
-        raise ValueError(f"Timestamp '{iso_timestamp}' is invalid. {e}")
+        raise ValueError(f"Timestamp '{iso_timestamp_string}' is invalid. {e}")
     else:
         iso_ts = ts.astimezone(dateutil.tz.UTC)
         return iso_ts.strftime("%Y-%m-%d %H:%M:%S")
@@ -297,9 +297,9 @@ def prepare_scripts(test_db: str, schema_filepaths: typing.List[str]):
 # This might be quite a large string but hopefully SQL doesn't choke
 # Convert a list [1,2,3] into string "(1,2,3)"
 def list_to_SQL(v):
-    if all(type(k) == str for k in v):
+    if all(isinstance(k, str) for k in v):
         return "(" + ",".join([f"'{k}'" for k in v]) + ")"
-    elif all(type(k) != str for k in v):
+    elif all(not isinstance(k, str) for k in v):
         return "(" + ",".join([f"{k}" for k in v]) + ")"
     else:
         raise AssertionError(f"Elements in the list are of mixed type: {v}")

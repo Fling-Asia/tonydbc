@@ -47,7 +47,6 @@ DATATYPE_MAP = {
     "timestamp": str,
     "bit": bool,
     "mediumint": int,
-    "smallint": int,
     "integer": int,
     "int8": np.int64,
     "int4": int,
@@ -98,7 +97,7 @@ class DataFrameFast(pd.DataFrame):
         if len(self) == 0:
             return
 
-        assert self.columns.is_unique, f"Dataframe columns are not unique:\n{df0}"
+        assert self.columns.is_unique, f"Dataframe columns are not unique:\n{self.columns}"
 
         # Drop columns which contain only NULL values since mariadb's stupid executemany might chokes on these
         # if they are in the final column
@@ -313,7 +312,7 @@ class DataFrameFast(pd.DataFrame):
                     for v in table_data_bad:
                         cursor.execute(cmd, v)
 
-    def column_info(self):
+    def column_info(self, table_name=None):
         """Returns the column information.
         Parameters:
             table_name: string.  If None, returns column info for ALL tables.
@@ -322,14 +321,21 @@ class DataFrameFast(pd.DataFrame):
         if table_name is not None:
             clauses.append(f"TABLE_NAME = '{table_name}'")
 
-        with con.cursor() as cursor:
+        with self.cursor() as cursor:
             cursor.execute(
                 f"SELECT * FROM INFORMATION_SCHEMA.COLUMNS "
                 f"WHERE {'AND '.join(clauses)};"
             )
-            records0 = cursor.fetchall()
+            records = cursor.fetchall()
+            fields = cursor.description
 
-        return pd.DataFrame(r)
+        # Convert records to list of dicts
+        records_dict = [
+            {fields[i][0]: field_value for i, field_value in enumerate(v)}
+            for v in records
+        ]
+
+        return pd.DataFrame(records_dict)
 
 
 def read_sql_table(name, con, query=None, *args, **kwargs):
@@ -366,8 +372,8 @@ def read_sql_table(name, con, query=None, *args, **kwargs):
         """
         with con.cursor() as cursor:
             cursor.execute(query)
-            records0 = cursor.fetchall()
-            # Get the field names
+            # records0 = cursor.fetchall()
+            # Get the field names - we don't need the records for this case
             cursor.execute(query + " LIMIT 0")
             columns = [v[0] for v in cursor.description]
 

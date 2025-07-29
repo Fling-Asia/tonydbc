@@ -42,7 +42,7 @@ class CaptureLogsHandler(logging.Handler):
 
 def check_duplicate_keys(dotenv_path):
     # Load key-value pairs from the .env file
-    env_dict = dotenv.dotenv_values(dotenv_path)
+    # env_dict = dotenv.dotenv_values(dotenv_path)  # Not currently used but may be useful for debugging
 
     # Read the file again as a plain text file
     with open(dotenv_path, "r") as f:
@@ -182,7 +182,7 @@ def get_env_list(key):
     if v is None:
         v = ""
 
-    assert type(v) == str
+    assert isinstance(v, str)
 
     # Get the string ready to be parsed
     v = v.strip().replace("'", '"')
@@ -202,7 +202,7 @@ def get_env_list(key):
         )
 
     # Confirm it's a list of nonempty strings
-    if not type(v_list) == list:
+    if not isinstance(v_list, list):
         raise ValueError(
             f"Environment variable {key} is "
             f"expected to be a list, but it is not: {os.environ[key]}"
@@ -211,7 +211,7 @@ def get_env_list(key):
     # Convert all elements to strings
     v_list = [str(v) for v in v_list]
 
-    if not all([type(x) == str and len(x) > 0 for x in v_list]):
+    if not all([isinstance(x, str) and len(x) > 0 for x in v_list]):
         raise ValueError(
             f"Environment variable {key} is "
             f"expected to be a list of strings, but it is "
