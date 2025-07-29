@@ -38,45 +38,41 @@ The common core methods of TonyDBC:
 
 """
 
-import os
-import sys
 import code
-import random
-import zoneinfo
-import time
-import inspect
-import tzlocal
-import pickle
-import threading
-import pandas as pd
-import dateutil
 import copy
-import shutil
+import inspect
+import os
 import pathlib
+import pickle
 import queue
-import filelock
-import uuid6
+import random
+import shutil
+import sys
+import threading
+import time
+import zoneinfo
 from contextlib import contextmanager
+
+import dateutil
+import filelock
 
 # Use the official mariadb Python connection library
 import mariadb
+import pandas as pd
+import tzlocal
+import uuid6
 from mariadb.constants.CLIENT import MULTI_STATEMENTS
-from .dataframe_fast import (
-    DataFrameFast,
-    read_sql_table,
-    DATATYPE_MAP,
-    FIELD_TYPE_DICT,
-)
-from .tony_utils import (
-    serialize_table,
-    deserialize_table,
-    get_tz_offset,
-    get_payload_info,
-    get_next_word_after_from,
-)
-from .env_utils import get_env_list
-from .tony_utils import prepare_scripts
 
+from .dataframe_fast import DATATYPE_MAP, FIELD_TYPE_DICT, DataFrameFast, read_sql_table
+from .env_utils import get_env_list
+from .tony_utils import (
+    deserialize_table,
+    get_next_word_after_from,
+    get_payload_info,
+    get_tz_offset,
+    prepare_scripts,
+    serialize_table,
+)
 
 # Maximum characters to output to `tony`.`query`
 QUERY_AUDIT_MAX_CHARS = 1000
@@ -133,6 +129,7 @@ class _TonyDBCOnlineOnly:
         lost_connection_callback=None,
         session_timezone=None,
         interact_after_error=False,
+        force_no_audit=False,
     ):
         """
         Parameters:
@@ -181,7 +178,7 @@ class _TonyDBCOnlineOnly:
         self._audit_db = None  # Separate TonyDBC instance for audit operations
 
         # For debugging purposes, we may wish to instrument all queries
-        if "AUDIT_PATH" in os.environ:
+        if (not force_no_audit) and "AUDIT_PATH" in os.environ:
             ipath = os.environ["AUDIT_PATH"]
             if ipath == "database":
                 # Track only on the database, not locally
@@ -213,6 +210,8 @@ class _TonyDBCOnlineOnly:
                 lost_connection_callback=self._lost_connection_callback,
                 session_timezone=self.session_timezone,
                 interact_after_error=self.interact_after_error,
+                # THIS IS CRUCIAL TO AVOID RECURSIVELY SETTING UP INFINITE AUDIT CONNECTIONS:
+                force_no_audit=True,
             )
             # Initialize the audit connection
             self._audit_db.__enter__()
@@ -317,14 +316,18 @@ class _TonyDBCOnlineOnly:
             self.log(f"set_timezone defaulting to DEFAULT_TIMEZONE {session_timezone}")
             assert session_timezone is not None, "Error: DEFAULT_TIMEZONE is None"
 
-        if not hasattr(self, 'session_timezone'):
+        if not hasattr(self, "session_timezone"):
             self.session_timezone = session_timezone
-            self.log(f"session_timezone was not set; now set to {self.session_timezone}")
+            self.log(
+                f"session_timezone was not set; now set to {self.session_timezone}"
+            )
         elif session_timezone == self.session_timezone:
             self.log(f"session_timezone unchanged at {self.session_timezone}")
             return
         else:
-            self.log(f"session_timezone changing from {self.session_timezone} -> {session_timezone}")
+            self.log(
+                f"session_timezone changing from {self.session_timezone} -> {session_timezone}"
+            )
             self.session_timezone = session_timezone
 
         if self.session_timezone not in zoneinfo.available_timezones():
@@ -395,7 +398,6 @@ class _TonyDBCOnlineOnly:
             )
             return False  # Do not handle the exception; propagate it up
         else:
-            pass
             self.log("TonyDBC: normal __exit__ successful.")
             # (No need to return a value since `exit_type` is None.)
 
