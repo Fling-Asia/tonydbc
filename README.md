@@ -1,6 +1,6 @@
 # TonyDBC
 
-Latest version: 1.2.26
+Latest version: 1.2.27
 
 Available on PyPI: https://pypi.org/project/tonydbc/
 
