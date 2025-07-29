@@ -151,7 +151,9 @@ def deserialize_table(
             cur_df[c] = cur_df.apply(
                 lambda v: v[c].tz_localize(session_timezone), axis=1
             )
-        elif isinstance(cur_df[c].dtype.type(), str) and (c.endswith("_at") or c == "timestamp"):
+        elif isinstance(cur_df[c].dtype.type(), str) and (
+            c.endswith("_at") or c == "timestamp"
+        ):
             # Try our best to do it to any other field such as DATETIME entries which
             # were not already set to pd.Timestamp objects
             # (note that this assumes the DATETIME entries are in our session timezone)

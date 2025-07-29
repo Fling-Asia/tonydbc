@@ -33,7 +33,7 @@ __version__ = "1.2.27"
 __all__ = [
     "load_dotenv",
     "get_env_bool",
-    "get_env_list", 
+    "get_env_list",
     "load_dotenvs",
     "set_MYSQL_DATABASE",
     "get_current_time",
@@ -42,8 +42,8 @@ __all__ = [
     "list_to_SQL2",
     "TonyDBC",
     "MQTTClient",
-    "DataFrameFast", 
-    "create_test_database"
+    "DataFrameFast",
+    "create_test_database",
 ]
 
 # Include vanialla dotenv.load_dotenv to be comprehensive, but it's not really needed
