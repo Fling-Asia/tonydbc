@@ -313,21 +313,27 @@ class _TonyDBCOnlineOnly:
         if None specified, default to os.environ["DEFAULT_TIMEZONE"]
         """
         if session_timezone is None:
-            self.session_timezone = os.environ["DEFAULT_TIMEZONE"]
+            session_timezone = os.environ["DEFAULT_TIMEZONE"]
+            self.log(f"set_timezone defaulting to DEFAULT_TIMEZONE {session_timezone}")
+            assert session_timezone is not None, "Error: DEFAULT_TIMEZONE is None"
+
+        if not hasattr(self, 'session_timezone'):
+            self.session_timezone = session_timezone
+            self.log(f"session_timezone was not set; now set to {self.session_timezone}")
         elif session_timezone == self.session_timezone:
-            self.log(f"Time zone unchanged ({self.session_timezone})")
+            self.log(f"session_timezone unchanged at {self.session_timezone}")
             return
         else:
+            self.log(f"session_timezone changing from {self.session_timezone} -> {session_timezone}")
             self.session_timezone = session_timezone
 
         if self.session_timezone not in zoneinfo.available_timezones():
             raise AssertionError(
-                f"The session timezone specified, {self.session_timezone}, "
+                f"The session_timezone specified, {self.session_timezone}, "
                 "is not a valid IANA time zone (for a complete list,"
                 " see zoneinfo.available_timezones())."
             )
 
-        # Require that the session timezone be the same as the system timezone
         system_timezone = str(tzlocal.get_localzone())
 
         if self.session_timezone != system_timezone:
