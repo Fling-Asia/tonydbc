@@ -184,6 +184,7 @@ class _TonyDBCOnlineOnly:
         self.prelim_session_timezone = session_timezone
 
         self.do_audit = False
+        self._audit_db = None  # Separate TonyDBC instance for audit operations
 
         # For debugging purposes, we may wish to instrument all queries
         if "AUDIT_PATH" in os.environ:
@@ -201,6 +202,24 @@ class _TonyDBCOnlineOnly:
 
     def __enter__(self):
         self.make_connection()
+
+        if self.do_audit:
+            # Create a separate database connection specifically for audit operations
+            # (we do this to avoid interfering with last_insert_id in the main connection)
+            self.log("Creating separate audit connection to preserve last_insert_id integrity.")
+            # Create a separate _TonyDBCOnlineOnly instance for audit operations
+            self._audit_db = _TonyDBCOnlineOnly(
+                host=self.host,
+                user=self.user,
+                password=self.password,
+                database=self.database,
+                autocommit=True,  # Always use autocommit for audit operations
+                lost_connection_callback=self._lost_connection_callback,
+                session_timezone=self.session_timezone,
+                interact_after_error=self.interact_after_error,
+            )
+            # Initialize the audit connection
+            self._audit_db.__enter__()            
 
     def make_connection(self):
         self.log(f"Connecting to database {self.database} on {self.host}.")
@@ -350,7 +369,15 @@ class _TonyDBCOnlineOnly:
             self.commit()
         self._mariatonydbcn.close()
         self.log(f"TonyDBC mariadb connection closed.")
+
         if self.do_audit:
+            assert self._audit_db is not None, "Audit connection is not available at __exit__ to shut down"
+
+            # Close the separate audit connection
+            self._audit_db.__exit__(None, None, None)
+            self.log(f"TonyDBC audit connection closed.")
+            self._audit_db = None
+
             self.log(f"TonyDBC debug logs at: `{self.host}`.`{self.database}`.`tony`")
             if str(self.ipath) != "database":
                 self.log(f"TonyDBC debug logs also at: {self.ipath}")
@@ -449,21 +476,16 @@ class _TonyDBCOnlineOnly:
         return pd.DataFrame(r)
 
     @property
-    def _last_insert_id(self):
-        # No need to do a commit here necessarily...
-        return self.get_data("SELECT LAST_INSERT_ID() AS id;", no_tracking=True)[0][
-            "id"
-        ]
-
-    @property
     def last_insert_id(self):
-        if self.do_audit:
-            raise AssertionError(
-                "last_insert_id is not stable if audit is on (it will return "
-                "the last_insert_id from the `tony` table instead). Please use return_reindexed "
-                " and then grab the value from df.iloc[0].name if you inserted one row"
-            )
-        return self._last_insert_id
+        """Get the last insert ID from the main connection.
+        
+        Note: This is now stable even when audit is enabled, because audit operations
+        use a separate database connection that doesn't interfere with the main connection's
+        last_insert_id value.
+        """
+        data = self.get_data("SELECT LAST_INSERT_ID() AS id;", no_tracking=True)
+        return data[0]["id"]
+
 
     def use(self, new_database: str):
         """Change databases"""
@@ -1176,9 +1198,10 @@ class _TonyDBCOnlineOnly:
         # cool right?
         if return_reindexed:
             # From testing on 2023-11-24, THIS is correct:
-            df.index = list(range(self._last_insert_id, self._last_insert_id + len(df)))
+            last_insert_id = self.last_insert_id
+            df.index = list(range(last_insert_id, last_insert_id + len(df)))
             # NOT this:
-            # df.index = list(range(self._last_insert_id - len(df) + 1, self._last_insert_id))
+            # df.index = list(range(last_insert_id - len(df) + 1, last_insert_id))
             df.index.name = pk
         else:
             df = None
@@ -1314,9 +1337,9 @@ class _TonyDBCOnlineOnly:
         # Remove newlines in query
         df["query"] = df["query"].str.strip().replace("\n", " ")
 
-        # Append this metadata to our `tony` table in the database
-        # don't track it or we will get infinite audit recursion
-        self.append_to_table("tony", df, no_tracking=True)
+        # Use separate audit connection to avoid interfering with last_insert_id
+        # Use the audit connection's append_to_table method
+        self._audit_db.append_to_table("tony", df, no_tracking=True)
 
         # If we aren't just tracking exclusively in the database,
         # then write to a file please
@@ -1338,6 +1361,12 @@ class _TonyDBCOnlineOnly:
                     )
 
 
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------
