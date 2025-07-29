@@ -39,22 +39,16 @@ The common core methods of TonyDBC:
 """
 
 import os
-import io
 import sys
 import code
-import json
 import random
-import pytz
 import zoneinfo
 import time
 import inspect
 import tzlocal
-import typing
 import pickle
 import threading
-import numpy as np
 import pandas as pd
-import datetime
 import dateutil
 import copy
 import shutil
@@ -326,7 +320,7 @@ class _TonyDBCOnlineOnly:
         else:
             self.session_timezone = session_timezone
 
-        if not self.session_timezone in zoneinfo.available_timezones():
+        if self.session_timezone not in zoneinfo.available_timezones():
             raise AssertionError(
                 f"The session timezone specified, {self.session_timezone}, "
                 "is not a valid IANA time zone (for a complete list,"
@@ -367,10 +361,10 @@ class _TonyDBCOnlineOnly:
     def __exit__(self, exit_type, value, traceback):
         # Commit all pending transactions if necessary
         if not self.autocommit:
-            self.log(f"TonyDBC commit pending transactions.")
+            self.log("TonyDBC commit pending transactions.")
             self.commit()
         self._mariatonydbcn.close()
-        self.log(f"TonyDBC mariadb connection closed.")
+        self.log("TonyDBC mariadb connection closed.")
 
         if self.do_audit:
             assert (
@@ -379,7 +373,7 @@ class _TonyDBCOnlineOnly:
 
             # Close the separate audit connection
             self._audit_db.__exit__(None, None, None)
-            self.log(f"TonyDBC audit connection closed.")
+            self.log("TonyDBC audit connection closed.")
             self._audit_db = None
 
             self.log(f"TonyDBC debug logs at: `{self.host}`.`{self.database}`.`tony`")
@@ -387,8 +381,8 @@ class _TonyDBCOnlineOnly:
                 self.log(f"TonyDBC debug logs also at: {self.ipath}")
 
         if exit_type == SystemExit:
-            self.log(f"TonyDBC: user typed exit() in interpreter.")
-        elif not exit_type is None:
+            self.log("TonyDBC: user typed exit() in interpreter.")
+        elif exit_type is not None:
             self.log(
                 f"TonyDBC: exception triggered __exit__: \n"
                 f"exit_type: {exit_type}\nvalue: {value}\ntraceback: {traceback}"
@@ -396,7 +390,7 @@ class _TonyDBCOnlineOnly:
             return False  # Do not handle the exception; propagate it up
         else:
             pass
-            self.log(f"TonyDBC: normal __exit__ successful.")
+            self.log("TonyDBC: normal __exit__ successful.")
             # (No need to return a value since `exit_type` is None.)
 
     def start_temp_conn(self):
@@ -468,7 +462,7 @@ class _TonyDBCOnlineOnly:
             table_name: string.  If None, returns column info for ALL tables.
         """
         clauses = [f"TABLE_SCHEMA = '{self.database}'"]
-        if not table_name is None:
+        if table_name is not None:
             clauses.append(f"TABLE_NAME = '{table_name}'")
 
         r = self.get_data(
@@ -677,7 +671,7 @@ class _TonyDBCOnlineOnly:
                     # every time though???
                     # https://stackoverflow.com/questions/1136437/
                     if (
-                        not before_retry_cmd is None
+                        before_retry_cmd is not None
                         and attempts_remaining < MAX_RECONNECTION_ATTEMPTS
                     ):
                         cursor.execute(before_retry_cmd)
@@ -699,7 +693,7 @@ class _TonyDBCOnlineOnly:
                         original_column_name
                         original_table_name
                     """
-                except mariadb.InterfaceError as e:
+                except mariadb.InterfaceError:
                     self.log(
                         f"Reconnecting to mariadb; attempting query again. "
                         f"Attempts remaining {attempts_remaining} BEFORE this attempt."
@@ -870,7 +864,7 @@ class _TonyDBCOnlineOnly:
                     # every time though???
                     # https://stackoverflow.com/questions/1136437/
                     if (
-                        not before_retry_cmd is None
+                        before_retry_cmd is not None
                         and attempts_remaining < MAX_RECONNECTION_ATTEMPTS
                     ):
                         cursor.execute(before_retry_cmd)
@@ -878,7 +872,7 @@ class _TonyDBCOnlineOnly:
                         cursor.execute(command, command_values)
                     else:
                         cursor.execute(command)
-                except mariadb.InterfaceError as e:
+                except mariadb.InterfaceError:
                     # Try reconnecting by explicitly calling the TonyDBC enter method
                     # (not any child class overridden version) by doing this instead
                     # of saying self.__enter__()
@@ -1232,7 +1226,7 @@ class _TonyDBCOnlineOnly:
 
         cur_df = self.read_dataframe_from_table(table, cols_to_deserialize, query=query)
 
-        if self.do_audit and (not query is None):
+        if self.do_audit and (query is not None):
             self._save_instrumentation(
                 method=inspect.currentframe().f_code.co_name,
                 table=table,
@@ -1462,7 +1456,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
         # Pickle our updates in case of error
         try:
             if not self.__update_queue.empty():
-                self.log(f"Pickling before flushing to be safe")
+                self.log("Pickling before flushing to be safe")
                 self.pickle_updates()
                 self.log(f"Flushing {self.__update_queue.qsize()} database updates")
                 while not self.__update_queue.empty():
@@ -1492,7 +1486,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
         try:
             with open(self.__offline_pickle_path, "rb") as pickle_file:
                 update_list = pickle.load(pickle_file)
-        except EOFError as e:
+        except EOFError:
             self.log(
                 f"Deleting corrupt pickle file {self.__offline_pickle_path} that is 0 bytes"
             )

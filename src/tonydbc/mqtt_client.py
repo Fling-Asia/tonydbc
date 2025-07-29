@@ -95,7 +95,7 @@ class MQTTClient:
     def on_disconnect(self, client, userdata, rc):
         assert client == self.__mqtt_client
         if rc == mqtt.MQTT_ERR_SUCCESS:
-            print(f"Disconnection (expected) of with rc = mqtt.MQTT_ERR_SUCCESS.")
+            print("Disconnection (expected) of with rc = mqtt.MQTT_ERR_SUCCESS.")
         if rc != 0:
             if not RECONNECT_ON_FAILURE:
                 raise IOError(

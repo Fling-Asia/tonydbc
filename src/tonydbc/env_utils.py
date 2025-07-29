@@ -17,7 +17,6 @@ common point to prevent messy path finding
 load_dotenvs() is all you need in most cases
 """
 
-import code
 import os
 import sys
 import logging
@@ -151,10 +150,10 @@ def check_environment_variable_integrity(env_filepath):
 
 def get_env_bool(key):
     """Handles the case of a boolean environment variable"""
-    if not key in os.environ:
+    if key not in os.environ:
         raise KeyError(f"No environment variable '{key}' was found.")
 
-    if not os.environ[key] in ("True", "False"):
+    if os.environ[key] not in ("True", "False"):
         raise AssertionError(
             f"Environment variable '{key}' is recorded "
             f"as '{os.environ[key]}', which is not a proper boolean. "
@@ -175,7 +174,7 @@ def get_env_list(key):
 
         Otherwise, it will return the list of strings.
     """
-    if not key in os.environ:
+    if key not in os.environ:
         raise KeyError(f"No environment variable {key}")
 
     v = os.environ[key]
@@ -252,7 +251,7 @@ def load_dotenvs():
         )
     else:
         print(
-            f"load_dotenvs: WARNING: No `DOT_ENVS` in os.environ, and no base env file."
+            "load_dotenvs: WARNING: No `DOT_ENVS` in os.environ, and no base env file."
         )
         env_paths_raw = []
 

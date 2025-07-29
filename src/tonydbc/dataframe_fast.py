@@ -18,7 +18,6 @@ import tempfile
 import csv
 import numpy as np
 import pandas as pd
-import warnings
 import mariadb
 from .env_utils import get_env_bool
 
@@ -80,7 +79,7 @@ LINE_TERMINATOR = "\n"  # Keep newline as is since the record separator is enoug
 
 class DataFrameFast(pd.DataFrame):
     def to_sql(self, name, con, if_exists="append", index=False, *args, **kwargs):
-        if not if_exists in ["replace", "append"]:
+        if if_exists not in ["replace", "append"]:
             raise AssertionError(
                 "not if_exists in ['replace', 'append'] is not yet impemented"
             )
@@ -320,7 +319,7 @@ class DataFrameFast(pd.DataFrame):
             table_name: string.  If None, returns column info for ALL tables.
         """
         clauses = [f"TABLE_SCHEMA = '{self.database}'"]
-        if not table_name is None:
+        if table_name is not None:
             clauses.append(f"TABLE_NAME = '{table_name}'")
 
         with con.cursor() as cursor:
@@ -360,7 +359,7 @@ def read_sql_table(name, con, query=None, *args, **kwargs):
             df[k] = df.apply(
                 lambda v: bool(int.from_bytes(v[k], byteorder="big")), axis=1
             )
-    elif not "CALL" in query.upper():
+    elif "CALL" not in query.upper():
         # We also have to return the columns names in case records is []
         """Use a trick to get the column names,
         even if the result set is 0 rows.  ChatGPT told me!  Wow.
