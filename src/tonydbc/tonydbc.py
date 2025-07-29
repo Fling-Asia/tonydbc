@@ -206,7 +206,9 @@ class _TonyDBCOnlineOnly:
         if self.do_audit:
             # Create a separate database connection specifically for audit operations
             # (we do this to avoid interfering with last_insert_id in the main connection)
-            self.log("Creating separate audit connection to preserve last_insert_id integrity.")
+            self.log(
+                "Creating separate audit connection to preserve last_insert_id integrity."
+            )
             # Create a separate _TonyDBCOnlineOnly instance for audit operations
             self._audit_db = _TonyDBCOnlineOnly(
                 host=self.host,
@@ -219,7 +221,7 @@ class _TonyDBCOnlineOnly:
                 interact_after_error=self.interact_after_error,
             )
             # Initialize the audit connection
-            self._audit_db.__enter__()            
+            self._audit_db.__enter__()
 
     def make_connection(self):
         self.log(f"Connecting to database {self.database} on {self.host}.")
@@ -371,7 +373,9 @@ class _TonyDBCOnlineOnly:
         self.log(f"TonyDBC mariadb connection closed.")
 
         if self.do_audit:
-            assert self._audit_db is not None, "Audit connection is not available at __exit__ to shut down"
+            assert (
+                self._audit_db is not None
+            ), "Audit connection is not available at __exit__ to shut down"
 
             # Close the separate audit connection
             self._audit_db.__exit__(None, None, None)
@@ -478,14 +482,13 @@ class _TonyDBCOnlineOnly:
     @property
     def last_insert_id(self):
         """Get the last insert ID from the main connection.
-        
+
         Note: This is now stable even when audit is enabled, because audit operations
         use a separate database connection that doesn't interfere with the main connection's
         last_insert_id value.
         """
         data = self.get_data("SELECT LAST_INSERT_ID() AS id;", no_tracking=True)
         return data[0]["id"]
-
 
     def use(self, new_database: str):
         """Change databases"""
@@ -723,7 +726,8 @@ class _TonyDBCOnlineOnly:
                     cursor.execute("SHOW WARNINGS;")
                 except mariadb.InterfaceError as e:
                     self.log(
-                        f"Cannot run cursor.execute('SHOW WARNINGS;') because mariadb.InterfaceError {e}.")
+                        f"Cannot run cursor.execute('SHOW WARNINGS;') because mariadb.InterfaceError {e}."
+                    )
                     warnings = []
                 else:
                     # Check for warnings

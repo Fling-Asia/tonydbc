@@ -237,7 +237,9 @@ def load_dotenvs():
         print(f"load_dotenvs: loading base env {base_env_path}")
         dotenv.load_dotenv(base_env_path, override=True)
     else:
-        print(f"load_dotenvs: WARNING: base env {base_env_path} .env file does not exist.")
+        print(
+            f"load_dotenvs: WARNING: base env {base_env_path} .env file does not exist."
+        )
 
     if "DOT_ENVS" in os.environ:
         # Get every .env we are supposed to load
@@ -249,7 +251,9 @@ def load_dotenvs():
             f"so defaulting to `DOT_ENVS` = {env_paths_raw}"
         )
     else:
-        print(f"load_dotenvs: WARNING: No `DOT_ENVS` in os.environ, and no base env file.")
+        print(
+            f"load_dotenvs: WARNING: No `DOT_ENVS` in os.environ, and no base env file."
+        )
         env_paths_raw = []
 
     # In some contexts, like docker on the server, it's impractical
@@ -266,8 +270,8 @@ def load_dotenvs():
     env_paths = [str(pathlib.Path(p).resolve()) for p in env_paths]
 
     # This is too verbose:
-    #env_paths_str = "\n".join(env_paths)
-    #print(f"`DOT_ENVS` are:\n{env_paths_str}")
+    # env_paths_str = "\n".join(env_paths)
+    # print(f"`DOT_ENVS` are:\n{env_paths_str}")
 
     # Load and check these files against their .env.example files for omissions
     for env_path in env_paths:
