@@ -474,7 +474,11 @@ class _TonyDBCOnlineOnly:
             clauses.append(f"TABLE_NAME = '{table_name}'")
 
         r = self.get_data(
-            f"SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE {'AND '.join(clauses)};",
+            f"""
+            SELECT *
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE {"AND ".join(clauses)};
+            """,
             no_tracking=True,
         )
 
