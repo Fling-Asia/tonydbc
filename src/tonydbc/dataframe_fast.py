@@ -71,8 +71,8 @@ FIELD_TYPE_DICT = {
 }
 
 # To handle as many strings as possible without any issues, let's use some very obscure characters to delimit the CSV
-FIELD_DELIMITER = "\x1F"  # Unit Separator (␟)
-ENCLOSURE_CHAR = "\x1E"  # Record Separator (␞)
+FIELD_DELIMITER = "\x1f"  # Unit Separator (␟)
+ENCLOSURE_CHAR = "\x1e"  # Record Separator (␞)
 LINE_TERMINATOR = "\n"  # Keep newline as is since the record separator is enough.
 
 
@@ -97,9 +97,9 @@ class DataFrameFast(pd.DataFrame):
         if len(self) == 0:
             return
 
-        assert (
-            self.columns.is_unique
-        ), f"Dataframe columns are not unique:\n{self.columns}"
+        assert self.columns.is_unique, (
+            f"Dataframe columns are not unique:\n{self.columns}"
+        )
 
         # Drop columns which contain only NULL values since mariadb's stupid executemany might chokes on these
         # if they are in the final column
@@ -162,7 +162,7 @@ class DataFrameFast(pd.DataFrame):
         cols = [f"`{c}`" for c in cols]
         cmd = (
             f"INSERT INTO `{name}` ({', '.join(cols)})"
-            f" VALUES ({', '.join(['?']*len(cols))})"
+            f" VALUES ({', '.join(['?'] * len(cols))})"
         )
 
         # Double-check that our dataframe does not contain our special csv control characters
@@ -211,7 +211,7 @@ class DataFrameFast(pd.DataFrame):
                     ENCLOSED BY %s
                     LINES TERMINATED BY %s
                     IGNORE 1 ROWS
-                    ({', '.join(cols)});
+                    ({", ".join(cols)});
                 """
 
             with con.cursor() as cursor:

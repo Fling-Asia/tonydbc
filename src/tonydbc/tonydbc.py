@@ -152,12 +152,12 @@ class _TonyDBCOnlineOnly:
                 setattr(self, field, param_value)
 
             val = getattr(self, field, "")
-            assert isinstance(
-                val, str
-            ), f"TonyDBC: Credential {field} ({val}) should be a string, not {type(val).__name__}"
-            assert (
-                len(val) > 0
-            ), f"TonyDBC: Credential {field} ({val}) should be a string of length > 0."
+            assert isinstance(val, str), (
+                f"TonyDBC: Credential {field} ({val}) should be a string, not {type(val).__name__}"
+            )
+            assert len(val) > 0, (
+                f"TonyDBC: Credential {field} ({val}) should be a string of length > 0."
+            )
 
         # uuid will be set when the connection is made
         self.session_uuid = str(uuid6.uuid8())
@@ -376,9 +376,9 @@ class _TonyDBCOnlineOnly:
         self.log("TonyDBC mariadb connection closed.")
 
         if self.do_audit:
-            assert (
-                self._audit_db is not None
-            ), "Audit connection is not available at __exit__ to shut down"
+            assert self._audit_db is not None, (
+                "Audit connection is not available at __exit__ to shut down"
+            )
 
             # Close the separate audit connection
             self._audit_db.__exit__(None, None, None)
@@ -474,8 +474,7 @@ class _TonyDBCOnlineOnly:
             clauses.append(f"TABLE_NAME = '{table_name}'")
 
         r = self.get_data(
-            f"SELECT * FROM INFORMATION_SCHEMA.COLUMNS "
-            f"WHERE {'AND '.join(clauses)};",
+            f"SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE {'AND '.join(clauses)};",
             no_tracking=True,
         )
 
@@ -576,7 +575,7 @@ class _TonyDBCOnlineOnly:
         # e.g. 'UPDATE roi SET OCR = ? WHERE `id` = ?'
         update_command = f"""
             UPDATE {table_name}
-            SET {', '.join([v+' = ?' for v in df_serialized.columns])}
+            SET {", ".join([v + " = ?" for v in df_serialized.columns])}
             WHERE `id` = ?
             """
 
@@ -1140,8 +1139,8 @@ class _TonyDBCOnlineOnly:
         # so we will pass a list of values to self.execute instead
         command = f"""
             INSERT INTO {table} 
-                       ({', '.join(stringified_row_dict.keys())}) 
-                VALUES ({", ".join(['%s' for _ in stringified_row_dict])})
+                       ({", ".join(stringified_row_dict.keys())}) 
+                VALUES ({", ".join(["%s" for _ in stringified_row_dict])})
             """
         command_values = list(map(str, stringified_row_dict.values()))
         self.execute(command=command, command_values=command_values)
@@ -1277,7 +1276,7 @@ class _TonyDBCOnlineOnly:
         if all(k in log_template for k in log_dict):
             query = f"""
                 INSERT INTO server_log (`module`, `state`, `log_event`, `message`, `_host`)
-                VALUES ('{str(log_dict['log_module'])}','{str(log_dict['log_state'])}','{str(log_dict['log_event'])}','{str(log_dict['log_message'])}','{str(log_dict['log_hostname'])}');
+                VALUES ('{str(log_dict["log_module"])}','{str(log_dict["log_state"])}','{str(log_dict["log_event"])}','{str(log_dict["log_message"])}','{str(log_dict["log_hostname"])}');
             """
             query = query.replace("'None'", "null")
             self.execute(query)
@@ -1542,9 +1541,9 @@ class TonyDBC(_TonyDBCOnlineOnly):
         # Clear the queue since we have now archived it
         self.__update_queue = queue.Queue()
 
-        assert (
-            self.__update_queue.empty()
-        ), "update_queue is not empty even though we just cleared it"
+        assert self.__update_queue.empty(), (
+            "update_queue is not empty even though we just cleared it"
+        )
 
         # Now that we have cleared the queue, we can go to online mode.
         self.is_online = True

@@ -281,9 +281,9 @@ def prepare_scripts(test_db: str, schema_filepaths: typing.List[str]):
         schema_filepaths: a list of strings which are paths to scripts
 
     """
-    assert not isinstance(
-        schema_filepaths, str
-    ), f"schema_filepaths ({schema_filepaths}) must be a list"
+    assert not isinstance(schema_filepaths, str), (
+        f"schema_filepaths ({schema_filepaths}) must be a list"
+    )
     program_to_run0 = ""
 
     # Run all the scripts requested
