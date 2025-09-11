@@ -174,7 +174,15 @@ def setup_tables(mariadb_container, db_connection, tonydbc_instance):
         compress=True,
     )
     print("Connection worked!")
+    with temp_conn.cursor() as cursor:
+        cursor.execute("SELECT 1")
+        result = cursor.fetchone()
+        print(f"Result: {result}")
+        cursor.execute("SHOW TABLES;")
+        tables = cursor.fetchall()
+        print(f"Tables: {tables}")
     temp_conn.close()
+    print("Connection closed!")
 
     import code
 
