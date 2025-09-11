@@ -38,16 +38,19 @@ try:
 except ImportError:
     from testcontainers.mysql import MySqlContainer as MariaDbContainer  # type: ignore
 
+
 # Check if Docker is available and running
 def check_docker_available():
     """Check if Docker is available and running"""
     try:
         import docker
+
         client = docker.from_env()
         client.ping()
         return True
     except Exception as e:
         return False, str(e)
+
 
 # Run Docker check at module level
 docker_check = check_docker_available()
@@ -55,7 +58,7 @@ if docker_check is not True:
     error_msg = f"""
 Docker is not running or not available!
 
-Error: {docker_check[1] if isinstance(docker_check, tuple) else 'Unknown Docker error'}
+Error: {docker_check[1] if isinstance(docker_check, tuple) else "Unknown Docker error"}
 
 To fix this:
 1. Install Docker Desktop from https://www.docker.com/products/docker-desktop/
@@ -96,7 +99,14 @@ def tonydbc_instance(mariadb_container):
     # Get the actual container connection details
     container_host = mariadb_container.get_container_host_ip()
     container_port = mariadb_container.get_exposed_port(3306)
-    
+
+    # DEBUG: Print the actual container details
+    print(f"DEBUG: Container host = {container_host}")
+    print(f"DEBUG: Container port = {container_port}")
+    print(f"DEBUG: Container username = {mariadb_container.username}")
+    print(f"DEBUG: Container password = {mariadb_container.password}")
+    print(f"DEBUG: Container database = {mariadb_container.dbname}")
+
     # Override environment variables for TonyDBC with actual container details
     container_env = {
         "MYSQL_HOST": container_host,
@@ -137,27 +147,38 @@ def tonydbc_instance(mariadb_container):
 
 
 @pytest.fixture(scope="session")
-def setup_tables(db_connection, tonydbc_instance):
+def setup_tables(mariadb_container, db_connection, tonydbc_instance):
     """Set up the required tables for testing"""
 
+    # Get the actual container connection details
+    actual_host = mariadb_container.get_container_host_ip()
+    actual_port = mariadb_container.get_exposed_port(3306)
+
     print("Creating temp connection to database")
+    print(f"Container host: {actual_host}")
+    print(f"Container port: {actual_port}")
+    print(f"TonyDBC instance host: {tonydbc_instance.host}")
+    print(f"TonyDBC instance port: {getattr(tonydbc_instance, 'port', 'NO_PORT_ATTR')}")
+
     temp_conn = mariadb.connect(
-                    host=tonydbc_instance.host,
-                    user=tonydbc_instance.user,
-                    password=tonydbc_instance.password,
-                    database=tonydbc_instance.database,
-                    client_flag=MULTI_STATEMENTS,
-                    autocommit=False,
-                    # connect_timeout=30,  # Default is 0, in seconds (have not yet tried this)
-                    read_timeout=3600,  # 15,  # in seconds
-                    write_timeout=3600,  # 20  # in seconds
-                    local_infile=True,
-                    compress=True,
-                )
-    print("Connection worked.")
+        host=actual_host,
+        port=int(actual_port),
+        user=mariadb_container.username,
+        password=mariadb_container.password,
+        database=mariadb_container.dbname,
+        client_flag=MULTI_STATEMENTS,
+        autocommit=False,
+        read_timeout=3600,
+        write_timeout=3600,
+        local_infile=True,
+        compress=True,
+    )
+    print("Connection worked!")
     temp_conn.close()
 
-    import code; code.interact(local=dict(globals(), **locals()))
+    import code
+
+    code.interact(local=dict(globals(), **locals()))
 
     with tonydbc_instance as db:
         # Create sortie table
