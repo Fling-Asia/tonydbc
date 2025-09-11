@@ -13,6 +13,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 import mariadb  # type: ignore
+from mariadb.constants.CLIENT import MULTI_STATEMENTS  # type: ignore
 
 # Set required environment variables BEFORE importing tonydbc
 # This prevents KeyError during module import
@@ -92,12 +93,18 @@ def db_connection(mariadb_container):
 @pytest.fixture(scope="session")
 def tonydbc_instance(mariadb_container):
     """Create a TonyDBC instance connected to the test container"""
+    # Get the actual container connection details
+    container_host = mariadb_container.get_container_host_ip()
+    container_port = mariadb_container.get_exposed_port(3306)
+    
     # Override environment variables for TonyDBC with actual container details
     container_env = {
-        "MYSQL_HOST": mariadb_container.get_container_host_ip(),
+        "MYSQL_HOST": container_host,
+        "MYSQL_PORT": str(container_port),
         "MYSQL_READWRITE_USER": mariadb_container.username,
         "MYSQL_READWRITE_PASSWORD": mariadb_container.password,
         "MYSQL_DATABASE": mariadb_container.dbname,
+        "MYSQL_TEST_DATABASE": mariadb_container.dbname,
         "DEFAULT_TIMEZONE": "UTC",
         "CHECK_ENVIRONMENT_INTEGRITY": "False",
         "USE_PRODUCTION_DATABASE": "False",
@@ -112,7 +119,8 @@ def tonydbc_instance(mariadb_container):
     try:
         # Create TonyDBC instance with container connection details
         db_instance = tonydbc.TonyDBC(
-            host=mariadb_container.get_container_host_ip(),
+            host=container_host,
+            port=int(container_port),
             user=mariadb_container.username,
             password=mariadb_container.password,
             database=mariadb_container.dbname,
@@ -131,6 +139,25 @@ def tonydbc_instance(mariadb_container):
 @pytest.fixture(scope="session")
 def setup_tables(db_connection, tonydbc_instance):
     """Set up the required tables for testing"""
+
+    print("Creating temp connection to database")
+    temp_conn = mariadb.connect(
+                    host=tonydbc_instance.host,
+                    user=tonydbc_instance.user,
+                    password=tonydbc_instance.password,
+                    database=tonydbc_instance.database,
+                    client_flag=MULTI_STATEMENTS,
+                    autocommit=False,
+                    # connect_timeout=30,  # Default is 0, in seconds (have not yet tried this)
+                    read_timeout=3600,  # 15,  # in seconds
+                    write_timeout=3600,  # 20  # in seconds
+                    local_infile=True,
+                    compress=True,
+                )
+    print("Connection worked.")
+    temp_conn.close()
+
+    import code; code.interact(local=dict(globals(), **locals()))
 
     with tonydbc_instance as db:
         # Create sortie table
