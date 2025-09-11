@@ -89,6 +89,7 @@ DEFAULT_CREDENTIALS = {
 # Max number of times to re-try a command if connection is lost
 MAX_RECONNECTION_ATTEMPTS = 3
 
+
 def get_currentframe_method() -> str:
     cur_frame = inspect.currentframe()
     if cur_frame and hasattr(cur_frame, "f_code"):
@@ -122,7 +123,7 @@ class _TonyDBCOnlineOnly:
     You can change the database it points to by running .use(new_database)
 
     """
-    
+
     # Type annotations for instance attributes
     host: str
     user: str
@@ -131,7 +132,7 @@ class _TonyDBCOnlineOnly:
     port: int
     session_uuid: str
     session_timezone: str
-    _audit_db: '_TonyDBCOnlineOnly | None'
+    _audit_db: "_TonyDBCOnlineOnly | None"
 
     def __init__(
         self,
@@ -766,7 +767,6 @@ class _TonyDBCOnlineOnly:
         ]
 
         if self.do_audit and not no_tracking:
-            
             self._save_instrumentation(
                 method=get_currentframe_method(),
                 table=None,
@@ -1367,6 +1367,7 @@ class _TonyDBCOnlineOnly:
 
         # Use separate audit connection to avoid interfering with last_insert_id
         # Use the audit connection's append_to_table method
+        assert self._audit_db is not None
         self._audit_db.append_to_table("tony", df, no_tracking=True)
 
         # If we aren't just tracking exclusively in the database,
@@ -1684,7 +1685,9 @@ class TonyDBC(_TonyDBCOnlineOnly):
             "insert_data": insert_data,
         }
         if self.is_online:
-            return super(TonyDBC, self).post_datalist(query=query, insert_data=insert_data)
+            return super(TonyDBC, self).post_datalist(
+                query=query, insert_data=insert_data
+            )
         else:
             self.__update_queue.put(("post_datalist", kwargs))
 
