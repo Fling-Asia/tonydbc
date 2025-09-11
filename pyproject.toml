@@ -11,9 +11,9 @@ version = "1.2.29"
 description = "A high-level database connector for MariaDB"
 readme = "README.md"
 authors = [{ name = "Michael Currie", email = "mcurrie@gmail.com" }]
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
 ]
