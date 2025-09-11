@@ -122,6 +122,16 @@ class _TonyDBCOnlineOnly:
     You can change the database it points to by running .use(new_database)
 
     """
+    
+    # Type annotations for instance attributes
+    host: str
+    user: str
+    password: str
+    database: str
+    port: int
+    session_uuid: str
+    session_timezone: str
+    _audit_db: '_TonyDBCOnlineOnly | None'
 
     def __init__(
         self,
