@@ -20,6 +20,7 @@ classifiers = [
 keywords = ["mariadb", "database", "connector", "ODBC", "pandas"]
 dependencies = [
     "iteration_utilities",
+    "types-python-dateutil",
     "python-dotenv",
     "more-itertools",
     "jsonschema",
@@ -29,12 +30,13 @@ dependencies = [
     "paho-mqtt",
     "mariadb",
     "pyperclip",
+    "types-pyperclip",
     "tzlocal",
     "paho-mqtt>=1.6.1",
     "filelock",
     "uuid6"
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9,<4.0"
 
 [project.optional-dependencies]
 dev = ["black", "bumpver", "isort", "pip-tools", "pytest"]

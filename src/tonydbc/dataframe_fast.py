@@ -12,13 +12,15 @@ NOTE: Works only with mariadb's connector for now (pip3 install mariadb)
 
 """
 
-import os
 import code
-import tempfile
 import csv
+import os
+import tempfile
+
+import mariadb
 import numpy as np
 import pandas as pd
-import mariadb
+
 from .env_utils import get_env_bool
 
 # Map SQL types to Python datatypes
@@ -136,12 +138,9 @@ class DataFrameFast(pd.DataFrame):
                     .dt.strftime("%Y-%m-%d %H:%M:%S.%f")
                 )
 
-                # Force the dtype conversion, which otherwise doesn't happen for some reason
-                df0.loc[:, dt_col] = ""
-                df0.loc[:, dt_col] = "override"
-                df0.loc[:, dt_col] = df0.loc[:, dt_col].astype(str)
-                # Now assign the string date information
-                df0.loc[:, dt_col] = new_col
+                # Directly assign the converted datetime strings without intermediate assignments
+                # This avoids the pandas FutureWarning about incompatible dtype assignment
+                df0.loc[:, dt_col] = new_col.astype(str)
 
         # Convert np.int64 columns to np.int32 since MySQL cannot accept np.int64 as a param
         small_int64cols = {
@@ -354,7 +353,6 @@ def read_sql_table(name, con, query=None, *args, **kwargs):
     )
 
     # TODO: convert all cols
-    pass
 
     # KLUDGE: for now, just convert any BIT fields to bool
     bit_cols = {k: bool for k, v in type_codes.items() if v.upper() == "BIT"}
