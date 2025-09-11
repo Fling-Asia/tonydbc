@@ -164,18 +164,33 @@ def deserialize_table(
     return cur_df
 
 
-def get_current_time(use_utc=False):
+def get_current_time(
+    use_utc: bool = False, default_timezone: str | None = None
+) -> datetime.datetime:
+    if default_timezone is None:
+        if "DEFAULT_TIMEZONE" in os.environ:
+            default_timezone = os.environ["DEFAULT_TIMEZONE"]
+        else:
+            default_timezone = "Asia/Bangkok"
     if use_utc:
         return datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
     else:
-        return datetime.datetime.now(pytz.timezone(os.environ["DEFAULT_TIMEZONE"]))
+        return datetime.datetime.now(pytz.timezone(default_timezone))
 
 
-def get_current_time_string(use_utc=False):
-    return get_current_time(use_utc).strftime("%Y-%m-%d %H:%M:%S")
+def get_current_time_string(
+    use_utc: bool = False, default_timezone: str | None = None
+) -> str:
+    return get_current_time(
+        use_utc=use_utc, default_timezone=default_timezone
+    ).strftime("%Y-%m-%d %H:%M:%S")
 
 
-def set_MYSQL_DATABASE():
+def set_MYSQL_DATABASE(
+    use_production_database: bool = get_env_bool("USE_PRODUCTION_DATABASE"),
+    mysql_production_database: str = os.environ["MYSQL_PRODUCTION_DATABASE"],
+    mysql_test_database: str = os.environ["MYSQL_TEST_DATABASE"],
+):
     """Set the MYSQL_DATABASE environment variable"""
     # If it's already been set, don't take any action
     # (this applies to our docker containers, which have it pre-set)
@@ -183,10 +198,10 @@ def set_MYSQL_DATABASE():
     #    return
 
     # Otherwise, set it according to whether we should be in production or not
-    if get_env_bool("USE_PRODUCTION_DATABASE"):
-        os.environ["MYSQL_DATABASE"] = os.environ["MYSQL_PRODUCTION_DATABASE"]
+    if use_production_database:
+        os.environ["MYSQL_DATABASE"] = mysql_production_database
     else:
-        os.environ["MYSQL_DATABASE"] = os.environ["MYSQL_TEST_DATABASE"]
+        os.environ["MYSQL_DATABASE"] = mysql_test_database
 
 
 def iso_timestamp_to_utc(
