@@ -17,7 +17,7 @@ import csv
 import os
 import tempfile
 
-import mariadb
+import mariadb  # type: ignore
 import numpy as np
 import pandas as pd
 
@@ -79,7 +79,7 @@ LINE_TERMINATOR = "\n"  # Keep newline as is since the record separator is enoug
 
 
 class DataFrameFast(pd.DataFrame):
-    def to_sql(self, name, con, if_exists="append", index=False, *args, **kwargs):
+    def to_sql(self, name, con, if_exists="append", index=False, *args, **kwargs):  # type: ignore[misc]
         if if_exists not in ["replace", "append"]:
             raise AssertionError(
                 "not if_exists in ['replace', 'append'] is not yet impemented"

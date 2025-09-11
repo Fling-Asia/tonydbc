@@ -52,16 +52,17 @@ import threading
 import time
 import zoneinfo
 from contextlib import contextmanager
+from typing import Any
 
 import dateutil
 import filelock
 
 # Use the official mariadb Python connection library
-import mariadb
+import mariadb  # type: ignore
 import pandas as pd
 import tzlocal
 import uuid6
-from mariadb.constants.CLIENT import MULTI_STATEMENTS
+from mariadb.constants.CLIENT import MULTI_STATEMENTS  # type: ignore
 
 from .dataframe_fast import DATATYPE_MAP, FIELD_TYPE_DICT, DataFrameFast, read_sql_table
 from .env_utils import get_env_list
@@ -87,6 +88,13 @@ DEFAULT_CREDENTIALS = {
 
 # Max number of times to re-try a command if connection is lost
 MAX_RECONNECTION_ATTEMPTS = 3
+
+def get_currentframe_method() -> str:
+    cur_frame = inspect.currentframe()
+    if cur_frame and hasattr(cur_frame, "f_code"):
+        return cur_frame.f_code.co_name
+    else:
+        return "unknown"
 
 
 def check_connection(fn):
@@ -499,7 +507,7 @@ class _TonyDBCOnlineOnly:
         """Change databases"""
         self.database = new_database
         # Reset current connections
-        self.__exit__()
+        self.__exit__(None, None, None)
         # Make new connections
         self.__enter__()
 
@@ -748,8 +756,9 @@ class _TonyDBCOnlineOnly:
         ]
 
         if self.do_audit and not no_tracking:
+            
             self._save_instrumentation(
-                method=inspect.currentframe().f_code.co_name,
+                method=get_currentframe_method(),
                 table=None,
                 query=query,
                 started_at=started_at,
@@ -930,7 +939,7 @@ class _TonyDBCOnlineOnly:
 
         if self.do_audit and not no_tracking:
             self._save_instrumentation(
-                method=inspect.currentframe().f_code.co_name,
+                method=get_currentframe_method(),
                 table=None,
                 query=command,
                 started_at=started_at,
@@ -940,7 +949,7 @@ class _TonyDBCOnlineOnly:
     def execute_script(
         self, script_path: str, get_return_values=False, cur_database=None
     ):
-        return_values = []
+        return_values: list[list[dict[str, Any]] | None] = []
         # Read the SQL schema file
         with open(script_path, "r") as file:
             script_string = file.read()
@@ -1000,7 +1009,7 @@ class _TonyDBCOnlineOnly:
         if get_return_values:
             return return_values
 
-    def get_primary_key(self, table: str, default: str = None):
+    def get_primary_key(self, table: str, default: str | None = None):
         try:
             return self.primary_keys[table]
         except KeyError as _:
@@ -1217,7 +1226,7 @@ class _TonyDBCOnlineOnly:
 
         if self.do_audit and not no_tracking:
             self._save_instrumentation(
-                method=inspect.currentframe().f_code.co_name,
+                method=get_currentframe_method(),
                 table=table,
                 query="INSERT",
                 started_at=started_at,
@@ -1239,7 +1248,7 @@ class _TonyDBCOnlineOnly:
 
         if self.do_audit and (query is not None):
             self._save_instrumentation(
-                method=inspect.currentframe().f_code.co_name,
+                method=get_currentframe_method(),
                 table=table,
                 query=query,
                 started_at=started_at,
@@ -1299,7 +1308,7 @@ class _TonyDBCOnlineOnly:
     def _save_instrumentation(
         self,
         method: str,
-        table: str,
+        table: str | None,
         query: str,
         started_at: pd.Timestamp,
         payload_size: int,
@@ -1665,7 +1674,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
             "insert_data": insert_data,
         }
         if self.is_online:
-            return super(TonyDBC, self).post_datalist(**kwargs)
+            return super(TonyDBC, self).post_datalist(query=query, insert_data=insert_data)
         else:
             self.__update_queue.put(("post_datalist", kwargs))
 
