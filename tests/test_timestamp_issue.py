@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-import mariadb
+import mariadb  # type: ignore
 
 # Set required environment variables BEFORE importing tonydbc
 # This prevents KeyError during module import
@@ -33,9 +33,37 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 import tonydbc
 
 try:
-    from testcontainers.mariadb import MariaDbContainer
+    from testcontainers.mariadb import MariaDbContainer  # type: ignore
 except ImportError:
-    from testcontainers.mysql import MySqlContainer as MariaDbContainer
+    from testcontainers.mysql import MySqlContainer as MariaDbContainer  # type: ignore
+
+# Check if Docker is available and running
+def check_docker_available():
+    """Check if Docker is available and running"""
+    try:
+        import docker
+        client = docker.from_env()
+        client.ping()
+        return True
+    except Exception as e:
+        return False, str(e)
+
+# Run Docker check at module level
+docker_check = check_docker_available()
+if docker_check is not True:
+    error_msg = f"""
+Docker is not running or not available!
+
+Error: {docker_check[1] if isinstance(docker_check, tuple) else 'Unknown Docker error'}
+
+To fix this:
+1. Install Docker Desktop from https://www.docker.com/products/docker-desktop/
+2. Start Docker Desktop and wait for it to fully load
+3. Verify with: docker --version && docker ps
+
+These tests require Docker to spin up a MariaDB container for testing.
+"""
+    raise RuntimeError(error_msg)
 
 
 @pytest.fixture(scope="session")
