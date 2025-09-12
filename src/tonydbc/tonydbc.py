@@ -710,7 +710,7 @@ class _TonyDBCOnlineOnly:
         # (I wrote this but it's not needed; only arrays need special deserialization
         # and this cannot be inferred from the SQL datatype which will be varchar)  :(
         # Query INFORMATION_SCHEMA to get column data types
-        # col_df = self.column_info()
+        # col_df = self.column_info(con=self._mariatonydbcn)
         # nonstring_filter = (col_df['DATA_TYPE'] != 'varchar')
         # Deserialize all columns in tables which are NOT varchar
         # table_filter = (col_df['TABLE_NAME'] == table)

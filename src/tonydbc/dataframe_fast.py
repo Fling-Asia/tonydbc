@@ -84,7 +84,7 @@ class DataFrameFast(pd.DataFrame):
     def to_sql_fast(
         self,
         name: str,
-        con: Any,
+        con: mariadb.Connection,
         session_timezone: str,
         if_exists: str = "append",
         index: bool = False,
@@ -323,7 +323,9 @@ class DataFrameFast(pd.DataFrame):
                     for v in table_data_bad:
                         cursor.execute(cmd, v)
 
-    def column_info(self, table_name: str | None = None) -> pd.DataFrame:
+    def column_info(
+        self, con: mariadb.Connection, table_name: str | None = None
+    ) -> pd.DataFrame:
         """Returns the column information.
         Parameters:
             table_name: string.  If None, returns column info for ALL tables.
@@ -332,7 +334,7 @@ class DataFrameFast(pd.DataFrame):
         if table_name is not None:
             clauses.append(f"TABLE_NAME = '{table_name}'")
 
-        with self.cursor() as this_cursor:
+        with con.cursor() as this_cursor:
             this_cursor.execute(
                 f"SELECT * FROM INFORMATION_SCHEMA.COLUMNS "
                 f"WHERE {'AND '.join(clauses)};"
