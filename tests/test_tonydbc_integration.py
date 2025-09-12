@@ -238,6 +238,20 @@ class TestTonyDBCIntegration:
         assert "Bob" in result_df["name"].values
         assert "Charlie" in result_df["name"].values
 
+    def test_write_dataframe_integration_results(self, setup_tables):
+        """End-to-end: write_dataframe persists rows and values correctly"""
+        db = setup_tables
+
+        # Fresh table for this test
+        db.execute("DROP TABLE IF EXISTS t;")
+        db.execute("CREATE TABLE t (id INT PRIMARY KEY, name VARCHAR(32));")
+
+        df = pd.DataFrame({"id": [1, 2], "name": ["A", "B"]})
+        db.write_dataframe(df, "t", if_exists="replace", index=False)
+
+        rows = db.get_data("SELECT id, name FROM t ORDER BY id;")
+        assert [(r["id"], r["name"]) for r in rows] == [(1, "A"), (2, "B")]
+
     def test_column_datatypes_real_table(self, setup_tables):
         """Test getting column datatypes from real table"""
         db = setup_tables

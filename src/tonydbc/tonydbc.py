@@ -693,7 +693,7 @@ class _TonyDBCOnlineOnly:
         )
 
     def read_dataframe_from_table(
-        self, table_name:str, columns_to_deserialize:list[str] = [], query:str | None = None
+        self, table_name: str, query: str, columns_to_deserialize: list[str] = []
     ):
         """Read the dataframe but don't set the index"""
         full_name = ".".join([self.database, table_name])
@@ -1312,17 +1312,19 @@ class _TonyDBCOnlineOnly:
 
         return df if return_reindexed else None
 
-    def query_table(self, table:str, query:str | None = None) -> pd.DataFrame:
+    def query_table(self, table: str, query: str) -> pd.DataFrame:
         """Query a single table and deserialize if necessary"""
-        cols_to_deserialize: list[str]
+        columns_to_deserialize: list[str]
         if table in self.media_to_deserialize:
-            cols_to_deserialize = self.media_to_deserialize[table]
+            columns_to_deserialize = self.media_to_deserialize[table]
         else:
-            cols_to_deserialize = []
+            columns_to_deserialize = []
 
         started_at = self.now()
 
-        cur_df = self.read_dataframe_from_table(table, cols_to_deserialize, query=query)
+        cur_df = self.read_dataframe_from_table(
+            table_name=table, query=query, columns_to_deserialize=columns_to_deserialize
+        )
 
         if self.do_audit and (query is not None):
             self._save_instrumentation(
@@ -1339,7 +1341,7 @@ class _TonyDBCOnlineOnly:
         """Load the ENTIRE table which might be highly inefficient
         but for small scales this should be fine.
         """
-        cur_df = self.query_table(table)
+        cur_df = self.query_table(table, f"""SELECT * FROM {table};""")
         setattr(self, f"{table}_df", cur_df)
 
     def log_to_db(self, log_dict: dict) -> None:
@@ -1703,7 +1705,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
         else:
             super(TonyDBC, self).drop_database(database)
 
-    def query_table(self, table, query=None) -> pd.DataFrame:
+    def query_table(self, table: str, query: str) -> pd.DataFrame:
         if not self.is_online:
             raise AssertionError("Cannot query table if not online")
         else:

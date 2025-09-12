@@ -1,7 +1,7 @@
 """
 Drop-in replacement for pandas.DataFrame methods for reading and writing to database:
 
-    pandas.DataFrame.to_sql
+    pandas.DataFrame.to_sql_fast
     pandas.read_sql_table
 
 For some reason the current (Jan 2023) implementation in Pandas
@@ -16,7 +16,7 @@ import code
 import csv
 import os
 import tempfile
-from typing import Any
+from typing import Any, cast
 
 import mariadb  # type: ignore
 import numpy as np
@@ -146,7 +146,9 @@ class DataFrameFast(pd.DataFrame):
                 # Directly assign the converted datetime strings without intermediate assignments
                 # This avoids the pandas FutureWarning about incompatible dtype assignment
                 # And by creating a fresh Series here, this will work even if df0 is empty
-                df0[dt_col] = pd.Series(new_col, dtype="string", index=df0.index)
+                # Note: we need to create SeriesCtor to satisfy mypy's "Series[Any]" not collable [operator] error
+                SeriesCtor = cast(type[pd.Series], pd.Series)
+                df0[dt_col] = SeriesCtor(new_col, dtype="string", index=df0.index)
 
         # Convert np.int64 columns to np.int32 since MySQL cannot accept np.int64 as a param
         small_int64cols = {
@@ -179,7 +181,7 @@ class DataFrameFast(pd.DataFrame):
                 return ENCLOSURE_CHAR in s or FIELD_DELIMITER in s
             return False
 
-        df_has_ctrl_chars = df0.applymap(has_ctrl_chars).values.any()
+        df_has_ctrl_chars = df0.map(has_ctrl_chars).to_numpy().any()
 
         if len(df0) == 0:
             # Nothing to INSERT
@@ -323,26 +325,6 @@ class DataFrameFast(pd.DataFrame):
                     for v in table_data_bad:
                         cursor.execute(cmd, v)
 
-    def to_sql(  # type: ignore[override]
-        self,
-        name: str,
-        con: Any,
-        session_timezone: str,
-        if_exists: str = "append",
-        index: bool = False,
-        *args: Any,
-        **kwargs: Any,
-    ) -> None:
-        self.to_sql_fast(
-            name=name,
-            con=con,
-            session_timezone=session_timezone,
-            if_exists=if_exists,
-            index=index,
-            *args,
-            **kwargs,
-        )
-
     def column_info(
         self, con: mariadb.Connection, table_name: str | None = None
     ) -> pd.DataFrame:
@@ -374,16 +356,14 @@ class DataFrameFast(pd.DataFrame):
 def read_sql_table(
     name: str,
     con: mariadb.Connection,
-    query: str | None = None,
+    query: str,
     *args: Any,
     **kwargs: Any,
 ) -> pd.DataFrame:
     """A drop-in replacement for pd.read_sql_table
     Note: this does not set an index.
     """
-    # Just use a basic query if none was specified
-    if query is None:
-        query = f"SELECT * FROM {name};"
+    assert query is not None
 
     # Use the main tonydbc to retrieve this with
     records, type_codes = con.get_data(
