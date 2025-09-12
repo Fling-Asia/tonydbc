@@ -78,24 +78,25 @@ class TestTonyDBCOnlineOnly:
         )
         # Manually set the connection to avoid calling make_connection
         db._mariatonydbcn = mock_conn
-        
+
         # Set up common attributes that would normally be set by set_timezone
         db.session_timezone = "UTC"
         import dateutil.tz
+
         db.default_tz = dateutil.tz.gettz("UTC")
-        
+
         # Set up common test data structures
         db._primary_keys = {
             "test_table": "id",
-            "users": "user_id", 
-            "products": "product_id"
+            "users": "user_id",
+            "products": "product_id",
         }
         db._column_datatypes = {
             "test_table": {"id": int, "name": str, "email": str},
             "users": {"user_id": int, "username": str, "email": str},
-            "products": {"product_id": int, "name": str, "price": float}
+            "products": {"product_id": int, "name": str, "price": float},
         }
-        
+
         yield db, mock_conn, mock_cursor
 
     def test_init_with_all_parameters(self):
@@ -461,7 +462,7 @@ class TestTonyDBCOnlineOnly:
         with patch("tonydbc.tonydbc.DataFrameFast") as mock_dataframe_fast:
             mock_df_instance = Mock()
             mock_dataframe_fast.return_value = mock_df_instance
-            
+
             db.write_dataframe(df, "test_table")
 
         mock_dataframe_fast.assert_called_once_with(df)
@@ -470,7 +471,7 @@ class TestTonyDBCOnlineOnly:
             con=db._mariatonydbcn,
             session_timezone="UTC",
             if_exists="replace",
-            index=False
+            index=False,
         )
 
     def test_update_table(self, tonydbc_instance):
@@ -544,9 +545,10 @@ class TestTonyDBCOnlineOnly:
     def test_get_data_with_retry_command(self, tonydbc_instance):
         """Test get_data executes before_retry_cmd on retry attempts"""
         db, mock_conn, mock_cursor = tonydbc_instance
-        
+
         # Create a call counter to track which call we're on
         call_count = 0
+
         def mock_execute_side_effect(query):
             nonlocal call_count
             call_count += 1
@@ -555,23 +557,32 @@ class TestTonyDBCOnlineOnly:
                 raise mariadb.InterfaceError("Connection lost")
             # Subsequent calls succeed
             return None
-            
+
         mock_cursor.execute.side_effect = mock_execute_side_effect
         mock_cursor.fetchall.return_value = []
         mock_cursor.description = []
 
-        with patch.object(db, 'make_connection'):  # Mock reconnection
-            db.get_data("SELECT * FROM test", before_retry_cmd="SET SESSION sql_mode = ''")
+        with patch.object(db, "make_connection"):  # Mock reconnection
+            db.get_data(
+                "SELECT * FROM test", before_retry_cmd="SET SESSION sql_mode = ''"
+            )
 
         # Verify that the retry command was executed at some point
         call_args_list = mock_cursor.execute.call_args_list
-        retry_commands = [call[0][0] for call in call_args_list if call[0][0] == "SET SESSION sql_mode = ''"]
-        assert len(retry_commands) == 1, f"Expected retry command to be called once, but got: {[call[0][0] for call in call_args_list]}"
-        
-        # Verify that the main query was attempted multiple times
-        main_queries = [call[0][0] for call in call_args_list if call[0][0] == "SELECT * FROM test"]
-        assert len(main_queries) >= 2, "Expected main query to be retried"
+        retry_commands = [
+            call[0][0]
+            for call in call_args_list
+            if call[0][0] == "SET SESSION sql_mode = ''"
+        ]
+        assert len(retry_commands) == 1, (
+            f"Expected retry command to be called once, but got: {[call[0][0] for call in call_args_list]}"
+        )
 
+        # Verify that the main query was attempted multiple times
+        main_queries = [
+            call[0][0] for call in call_args_list if call[0][0] == "SELECT * FROM test"
+        ]
+        assert len(main_queries) >= 2, "Expected main query to be retried"
 
     def test_databases_property(self, tonydbc_instance):
         """Test databases property returns list of databases"""
@@ -612,7 +623,16 @@ class TestTonyDBCOnlineOnly:
             result = db.production_databases
 
         # Should include env databases + system databases, sorted
-        expected = sorted(["prod1", "prod2", "information_schema", "mysql", "performance_schema", "sys"])
+        expected = sorted(
+            [
+                "prod1",
+                "prod2",
+                "information_schema",
+                "mysql",
+                "performance_schema",
+                "sys",
+            ]
+        )
         assert result == expected
 
     def test_production_databases_empty_list(self, tonydbc_instance):
@@ -632,7 +652,7 @@ class TestTonyDBCOnlineOnly:
 
         # Set the private attribute directly to simulate production databases
         db._TonyDBCOnlineOnly__production_databases = ["prod_db"]
-        
+
         with pytest.raises(AssertionError, match="production database"):
             db.drop_database("prod_db")
 
@@ -642,12 +662,12 @@ class TestTonyDBCOnlineOnly:
 
         # Set the private attribute to empty list (no production databases)
         db._TonyDBCOnlineOnly__production_databases = []
-        
+
         def mock_get_data(query):
             if query == "SHOW DATABASES;":
                 return [{"Database": "test_db"}, {"Database": "other_db"}]
             return []
-        
+
         with (
             patch.object(db, "get_data", side_effect=mock_get_data),
             patch.object(db, "execute") as mock_execute,
@@ -728,7 +748,9 @@ class TestTonyDBCOnlineOnly:
 
         # Mock cursor to return data
         mock_cursor.fetchall.return_value = [(1,)]
-        mock_cursor.description = [("result", None, None, None, None, None, None, None, None, None, None)]
+        mock_cursor.description = [
+            ("result", None, None, None, None, None, None, None, None, None, None)
+        ]
 
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".sql", delete=False
@@ -756,25 +778,41 @@ class TestTonyDBCOnlineOnly:
     def test_get_primary_key_with_default(self, tonydbc_instance):
         """Test get_primary_key returns default when table has no primary key"""
         db, mock_conn, mock_cursor = tonydbc_instance
-        
+
         # Create an actual table with no primary key in the mock database
         # First, create the table structure in our mock data
         db._primary_keys = {
             "users": "user_id",  # Other tables have primary keys
         }
-        
+
         # Mock get_data to simulate a table that exists but has no primary key
         def mock_get_data(query, no_tracking=False):
             if "DESCRIBE no_pk_table" in query:
                 # Return table description with columns but no primary key (Key is empty)
                 return [
-                    {"Field": "col1", "Type": "varchar(100)", "Null": "YES", "Key": "", "Default": None, "Extra": ""},
-                    {"Field": "col2", "Type": "int(11)", "Null": "YES", "Key": "", "Default": None, "Extra": ""}
+                    {
+                        "Field": "col1",
+                        "Type": "varchar(100)",
+                        "Null": "YES",
+                        "Key": "",
+                        "Default": None,
+                        "Extra": "",
+                    },
+                    {
+                        "Field": "col2",
+                        "Type": "int(11)",
+                        "Null": "YES",
+                        "Key": "",
+                        "Default": None,
+                        "Extra": "",
+                    },
                 ]
             return []
 
         with patch.object(db, "get_data", side_effect=mock_get_data):
-            with patch.object(db, "refresh_primary_keys"):  # Mock to avoid real DB calls
+            with patch.object(
+                db, "refresh_primary_keys"
+            ):  # Mock to avoid real DB calls
                 result = db.get_primary_key("no_pk_table", default="pk_id")
 
         assert result == "pk_id"

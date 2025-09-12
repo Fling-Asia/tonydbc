@@ -34,6 +34,7 @@ os.environ.setdefault("MYSQL_TEST_DATABASE", "test_db")
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from testcontainers.core.container import DockerContainer
+
 import tonydbc
 
 
@@ -41,6 +42,7 @@ def check_docker_available() -> bool:
     """Check if Docker is available and running"""
     try:
         import docker
+
         client = docker.from_env()
         client.ping()
         return True
@@ -48,7 +50,9 @@ def check_docker_available() -> bool:
         return False
 
 
-def _wait_db(host: str, port: int, user: str, pwd: str, db: str, timeout: int = 30) -> None:
+def _wait_db(
+    host: str, port: int, user: str, pwd: str, db: str, timeout: int = 30
+) -> None:
     """Wait for database to be ready"""
     start_time = time.time()
     while time.time() - start_time < timeout:
@@ -85,7 +89,7 @@ def mariadb_container() -> Generator[Any, None, None]:
         .with_env("MYSQL_PASSWORD", pwd)
         .with_exposed_ports(3306)
     )
-    
+
     with container as c:
         host = c.get_container_host_ip()
         port = int(c.get_exposed_port(3306))
@@ -155,7 +159,7 @@ def setup_tables(tonydbc_instance):
                 email VARCHAR(100)
             )
         """)
-        
+
         # Create a table with NO primary key
         db.execute("""
             CREATE TABLE IF NOT EXISTS no_pk_table (
@@ -163,7 +167,7 @@ def setup_tables(tonydbc_instance):
                 col2 INT
             )
         """)
-        
+
         # Create a users table
         db.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -172,12 +176,12 @@ def setup_tables(tonydbc_instance):
                 email VARCHAR(100)
             )
         """)
-        
+
         yield db
-        
+
         # Cleanup
         db.execute("DROP TABLE IF EXISTS test_table")
-        db.execute("DROP TABLE IF EXISTS no_pk_table") 
+        db.execute("DROP TABLE IF EXISTS no_pk_table")
         db.execute("DROP TABLE IF EXISTS users")
 
 
@@ -187,11 +191,11 @@ class TestTonyDBCIntegration:
     def test_get_primary_key_with_real_table(self, setup_tables):
         """Test get_primary_key with real database table"""
         db = setup_tables
-        
+
         # Test table with primary key
         result = db.get_primary_key("test_table")
         assert result == "id"
-        
+
         # Test table with primary key (users)
         result = db.get_primary_key("users")
         assert result == "user_id"
@@ -199,7 +203,7 @@ class TestTonyDBCIntegration:
     def test_get_primary_key_with_default_real_table(self, setup_tables):
         """Test get_primary_key returns default when table has no primary key"""
         db = setup_tables
-        
+
         # Test table with NO primary key - should return default
         result = db.get_primary_key("no_pk_table", default="pk_id")
         assert result == "pk_id"
@@ -207,14 +211,18 @@ class TestTonyDBCIntegration:
     def test_insert_and_query_real_data(self, setup_tables):
         """Test inserting and querying real data"""
         db = setup_tables
-        
+
         # Insert some test data
-        db.execute("INSERT INTO test_table (name, email) VALUES ('John', 'john@test.com')")
-        db.execute("INSERT INTO test_table (name, email) VALUES ('Jane', 'jane@test.com')")
-        
+        db.execute(
+            "INSERT INTO test_table (name, email) VALUES ('John', 'john@test.com')"
+        )
+        db.execute(
+            "INSERT INTO test_table (name, email) VALUES ('Jane', 'jane@test.com')"
+        )
+
         # Query the data back
         result = db.get_data("SELECT * FROM test_table ORDER BY id")
-        
+
         assert len(result) == 2
         assert result[0]["name"] == "John"
         assert result[0]["email"] == "john@test.com"
@@ -224,19 +232,21 @@ class TestTonyDBCIntegration:
     def test_dataframe_operations_real_db(self, setup_tables):
         """Test DataFrame operations with real database"""
         db = setup_tables
-        
+
         # Create test DataFrame
-        df = pd.DataFrame({
-            "name": ["Alice", "Bob", "Charlie"],
-            "email": ["alice@test.com", "bob@test.com", "charlie@test.com"]
-        })
-        
+        df = pd.DataFrame(
+            {
+                "name": ["Alice", "Bob", "Charlie"],
+                "email": ["alice@test.com", "bob@test.com", "charlie@test.com"],
+            }
+        )
+
         # Write DataFrame to database
         db.write_dataframe(df, "test_table", if_exists="append", index=False)
-        
+
         # Read data back
         result_df = db.query_table("test_table")
-        
+
         assert len(result_df) == 3
         assert "Alice" in result_df["name"].values
         assert "Bob" in result_df["name"].values
@@ -245,10 +255,10 @@ class TestTonyDBCIntegration:
     def test_column_datatypes_real_table(self, setup_tables):
         """Test getting column datatypes from real table"""
         db = setup_tables
-        
+
         # Get column datatypes for test_table
         result = db.get_column_datatypes("test_table")
-        
+
         assert "id" in result
         assert "name" in result
         assert "email" in result
@@ -260,20 +270,20 @@ class TestTonyDBCIntegration:
     def test_temp_id_table_real_db(self, setup_tables):
         """Test creating temporary ID table with real database"""
         db = setup_tables
-        
+
         id_list = [1, 2, 3, 4, 5]
-        
+
         # Use temp_id_table context manager
         with db.temp_id_table(id_list) as temp_table_name:
             # Verify the temporary table exists and has data
             result = db.get_data(f"SELECT * FROM {temp_table_name} ORDER BY id")
-            
+
             assert len(result) == 5
             assert [row["id"] for row in result] == [1, 2, 3, 4, 5]
-            
+
             # Verify table name format
             assert temp_table_name.startswith("temp_loc_ids_")
-        
+
         # After context manager, table should be dropped
         # This should raise an error since table no longer exists
         with pytest.raises(Exception):
