@@ -67,13 +67,10 @@ def serialize_table(
     for c in columns_to_serialize0:
         # No need to serialize into STRING 'None' anymore; mariadb connector can handle None
         try:
-            cur_df.loc[:, c] = cur_df.loc[:, [c]].apply(
-                lambda v: (
-                    None
-                    if np.any(pd.isna(v[c]))
-                    else json.dumps(v[c], cls=NumpyEncoder)
-                ),
-                axis=1,
+            # Use Series.apply on the single column to satisfy mypy's overloads
+            col_series = cur_df.loc[:, c]
+            cur_df.loc[:, c] = col_series.apply(
+                lambda x: None if np.any(pd.isna(x)) else json.dumps(x, cls=NumpyEncoder)
             )
         except TypeError as e:
             raise TypeError(f"Column {c} could not be serialized; {e}")
@@ -91,19 +88,14 @@ def serialize_table(
     for col in int_cols:
         if col in cur_df.columns:
             # Convert to nullable integer type (Int64 for int64, Int32 for int32, etc.)
+            # these types properly handle None/NaN as pd.NA
             target_dtype = dict(col_dtypes)[col]
-            if target_dtype is int:
-                # Use pandas nullable integer type
-                nullable_dtype = pd.Int64Dtype()  # Default nullable int
-            elif target_dtype is np.int64:
-                nullable_dtype = pd.Int64Dtype()
+            if target_dtype is int or target_dtype is np.int64:
+                cur_df[col] = cur_df[col].astype("Int64")
             elif target_dtype is np.int32:
-                nullable_dtype = pd.Int32Dtype()
+                cur_df[col] = cur_df[col].astype("Int32")
             else:
-                nullable_dtype = pd.Int64Dtype()  # Fallback
-
-            # Convert to nullable integer type - this properly handles None/NaN as pd.NA
-            cur_df[col] = cur_df[col].astype(nullable_dtype)
+                cur_df[col] = cur_df[col].astype("Int64")
 
     # If we explicitly cast string columns to str instead of leaving them as object
     # then None values will be replaced with 'None' and won't insert properly into the database

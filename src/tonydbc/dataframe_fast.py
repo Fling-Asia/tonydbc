@@ -80,10 +80,11 @@ LINE_TERMINATOR = "\n"  # Keep newline as is since the record separator is enoug
 
 
 class DataFrameFast(pd.DataFrame):
-    def to_sql(
+    # Use a distinct name to avoid overriding pandas' final to_sql
+    def to_sql_fast(
         self,
         name: str,
-        con: mariadb.Connection,
+        con: Any,
         session_timezone: str,
         if_exists: str = "append",
         index: bool = False,
@@ -161,7 +162,7 @@ class DataFrameFast(pd.DataFrame):
         # Prepare an INSERT which will populate the real mariadb table with df's data
         # INSERT INTO table(c1,c2,...) VALUES (v11,v12,...), ... (vnn,vn2,...);
         # If index, then we also want the index inserted
-        cols = [df0.index.name] * index + list(df0.columns)
+        cols = ([df0.index.name] if index else []) + [str(c) for c in list(df0.columns)]
         # Sanitize the column names
         cols = [f"`{c}`" for c in cols]
         assert all(isinstance(c, str) for c in cols)
@@ -263,7 +264,7 @@ class DataFrameFast(pd.DataFrame):
                     )
                     for sublist in table_data
                 ]
-                table_data = table_data_typed
+                table_data = table_data_typed  # type: ignore[assignment]
             except ValueError as e:
                 if get_env_bool("INTERACT_AFTER_ERROR"):
                     code.interact(

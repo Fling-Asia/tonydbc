@@ -52,7 +52,9 @@ import threading
 import time
 import zoneinfo
 from contextlib import contextmanager
-from typing import Any, Callable, Type
+from typing import Any, Callable, Type, Literal, overload
+from types import TracebackType
+from typing import Type
 
 import dateutil
 import filelock
@@ -341,7 +343,7 @@ class _TonyDBCOnlineOnly:
 
             self.execute(cmd, no_tracking=True)
 
-    def set_timezone(self, session_timezone: str | None = None) -> None:
+    def set_timezone(self, session_timezone: str | None = None) -> "_TonyDBCOnlineOnly":
         """
         Set the IANA session time zone for display and input purposes for TIMEZONE fields
         e.g. session_timezone = "Asia/Bangkok" => session_time_offset = "+07:00"
@@ -413,10 +415,10 @@ class _TonyDBCOnlineOnly:
 
     def __exit__(
         self,
-        exit_type: Type[BaseException] | None,
-        value: BaseException | None,
-        traceback: Any | None,
-    ) -> None:
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
         # Commit all pending transactions if necessary
         if not self.autocommit:
             self.log("TonyDBC commit pending transactions.")
@@ -446,12 +448,12 @@ class _TonyDBCOnlineOnly:
             if str(self.ipath) != "database":
                 self.log(f"TonyDBC debug logs also at: {self.ipath}")
 
-        if isinstance(exit_type, type(SystemExit)):
+        if isinstance(exc_type, type(SystemExit)):
             self.log("TonyDBC: user typed exit() in interpreter.")
-        elif exit_type is not None:
+        elif exc_type is not None:
             self.log(
                 f"TonyDBC: exception triggered __exit__: \n"
-                f"exit_type: {exit_type}\nvalue: {value}\ntraceback: {traceback}"
+                f"exc_type: {exc_type}\nvalue: {exc_val}\ntraceback: {exc_tb}"
             )
             return False  # Do not handle the exception; propagate it up
         else:
@@ -472,7 +474,7 @@ class _TonyDBCOnlineOnly:
         if not self.using_temp_conn:
             raise AssertionError("You are not using your temporary connection.")
         # Close the temporary connection
-        self.__exit__(exit_type=None, value=None, traceback=None)
+        self.__exit__(None, None, None)
         # Restore the original connection
         self._mariatonydbcn = self._mariatonydbcn_old
         self.using_temp_conn = False
@@ -588,7 +590,7 @@ class _TonyDBCOnlineOnly:
         Assumes the fields are the same in number and data type
         """
         df0 = DataFrameFast(df)
-        df0.to_sql(
+        df0.to_sql_fast(
             name=table_name,
             con=self._mariatonydbcn,
             session_timezone=self.session_timezone,
@@ -724,13 +726,31 @@ class _TonyDBCOnlineOnly:
 
         return df
 
+    @overload
+    def get_data(
+        self,
+        query: str,
+        before_retry_cmd: str | None = ...,
+        no_tracking: bool = ...,
+        return_type_codes: Literal[False] = ...,
+    ) -> list[dict[str, Any]]: ...
+
+    @overload
+    def get_data(
+        self,
+        query: str,
+        before_retry_cmd: str | None = ...,
+        no_tracking: bool = ...,
+        return_type_codes: Literal[True] = ...,
+    ) -> tuple[list[dict[str, Any]], dict[Any, str]]: ...
+
     def get_data(
         self,
         query: str,
         before_retry_cmd: str | None = None,
         no_tracking: bool = False,
         return_type_codes: bool = False,
-    ) -> list[dict[str, Any]] | tuple[list[dict[Any, Any]], dict[Any, str]]:
+    ) -> Any:
         if self.do_audit and not no_tracking:
             started_at = self.now()
 
@@ -1275,12 +1295,11 @@ class _TonyDBCOnlineOnly:
         if return_reindexed:
             # From testing on 2023-11-24, THIS is correct:
             last_insert_id = self.last_insert_id
-            df.index = list(range(last_insert_id, last_insert_id + len(df)))
+            # mypy: df.index is Index[Any]; assigning list is valid at runtime but not in types
+            df.index = list(range(last_insert_id, last_insert_id + len(df)))  # type: ignore[assignment]
             # NOT this:
             # df.index = list(range(last_insert_id - len(df) + 1, last_insert_id))
             df.index.name = pk
-        else:
-            df = None
 
         if self.do_audit and not no_tracking:
             self._save_instrumentation(
@@ -1291,7 +1310,8 @@ class _TonyDBCOnlineOnly:
                 **payload_info,
             )
 
-        return df
+        if return_reindexed:
+            return df
 
     def query_table(self, table, query=None):
         """Query a single table and deserialize if necessary"""
@@ -1555,7 +1575,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
             else:
                 raise AttributeError(e)
 
-    def __enter__(self):
+    def __enter__(self) -> "TonyDBC":
         super().__enter__()
 
         if not os.path.isfile(self.__offline_pickle_path):
@@ -1608,7 +1628,12 @@ class TonyDBC(_TonyDBCOnlineOnly):
 
             self.__update_queue = backup_queue
 
-    def __exit__(self, exit_type, value, traceback):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
         self.pickle_updates()
 
         # Clear the queue since we have now archived it
@@ -1621,7 +1646,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
         # Now that we have cleared the queue, we can go to online mode.
         self.is_online = True
 
-        super().__exit__(exit_type, value, traceback)
+        super().__exit__(exc_type, exc_val, exc_tb)
 
     def start_temp_conn(self):
         if not self.is_online:
