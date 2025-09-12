@@ -78,22 +78,6 @@ def mariadb_container():
 
 
 @pytest.fixture(scope="session")
-def db_connection(mariadb_container):
-    """Create a raw MariaDB connection for setup"""
-    conn = mariadb.connect(
-        host=mariadb_container.get_container_host_ip(),
-        port=mariadb_container.get_exposed_port(3306),
-        user=mariadb_container.username,
-        password=mariadb_container.password,
-        database=mariadb_container.dbname,
-    )
-    try:
-        yield conn
-    finally:
-        conn.close()
-
-
-@pytest.fixture(scope="session")
 def tonydbc_instance(mariadb_container):
     """Create a TonyDBC instance connected to the test container"""
     # Get the actual container connection details
@@ -161,7 +145,7 @@ def tonydbc_instance(mariadb_container):
 
 
 @pytest.fixture(scope="session")
-def setup_tables(mariadb_container, db_connection, tonydbc_instance):
+def setup_tables(mariadb_container, tonydbc_instance):
     """Set up the required tables for testing"""
 
     # Get the actual container connection details
@@ -198,12 +182,8 @@ def setup_tables(mariadb_container, db_connection, tonydbc_instance):
     temp_conn.close()
     print("Connection closed!")
 
-    import code
-
-    code.interact(local=dict(globals(), **locals()))
-
     with tonydbc_instance as db:
-        print("GOT HERE!")
+        print("tonydbc instance entered successfully")
         # Create sortie table
         db.execute("""
             CREATE TABLE IF NOT EXISTS `sortie` (
@@ -574,7 +554,8 @@ def test_timestamp_workarounds(setup_tables):
         total_videos = db.get_data("SELECT COUNT(*) as count FROM video")[0]["count"]
         print(f"\n📈 Total videos in database: {total_videos}")
 
-        return strategies
+        # Don't return anything to avoid pytest warning
+        assert len(strategies) > 0, "No strategies were tested"
 
 
 def test_column_type_inspection(setup_tables):
