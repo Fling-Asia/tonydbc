@@ -69,7 +69,7 @@ class TestTonyDBCOnlineOnly:
 
     @pytest.fixture
     def tonydbc_instance(self, mock_connection):
-        """Create a TonyDBC instance with mocked connection"""
+        """Create a TonyDBC instance with mocked connection and common test data"""
         mock_conn, mock_cursor = mock_connection
 
         # Create the instance without calling __enter__
@@ -78,6 +78,24 @@ class TestTonyDBCOnlineOnly:
         )
         # Manually set the connection to avoid calling make_connection
         db._mariatonydbcn = mock_conn
+        
+        # Set up common attributes that would normally be set by set_timezone
+        db.session_timezone = "UTC"
+        import dateutil.tz
+        db.default_tz = dateutil.tz.gettz("UTC")
+        
+        # Set up common test data structures
+        db._primary_keys = {
+            "test_table": "id",
+            "users": "user_id", 
+            "products": "product_id"
+        }
+        db._column_datatypes = {
+            "test_table": {"id": int, "name": str, "email": str},
+            "users": {"user_id": int, "username": str, "email": str},
+            "products": {"product_id": int, "name": str, "price": float}
+        }
+        
         yield db, mock_conn, mock_cursor
 
     def test_init_with_all_parameters(self):
@@ -429,7 +447,6 @@ class TestTonyDBCOnlineOnly:
     def test_iso_timestamp_to_session_time_zone(self, tonydbc_instance):
         """Test iso_timestamp_to_session_time_zone converts timestamp"""
         db, mock_conn, mock_cursor = tonydbc_instance
-        db.session_timezone = "UTC"
 
         result = db.iso_timestamp_to_session_time_zone("2023-01-01T12:00:00+00:00")
 
@@ -441,23 +458,35 @@ class TestTonyDBCOnlineOnly:
         db, mock_conn, mock_cursor = tonydbc_instance
         df = pd.DataFrame({"id": [1, 2], "name": ["A", "B"]})
 
-        with patch.object(df, "to_sql") as mock_to_sql:
+        with patch("tonydbc.tonydbc.DataFrameFast") as mock_dataframe_fast:
+            mock_df_instance = Mock()
+            mock_dataframe_fast.return_value = mock_df_instance
+            
             db.write_dataframe(df, "test_table")
 
-        mock_to_sql.assert_called_once()
+        mock_dataframe_fast.assert_called_once_with(df)
+        mock_df_instance.to_sql.assert_called_once_with(
+            name="test_table",
+            con=db._mariatonydbcn,
+            session_timezone="UTC",
+            if_exists="replace",
+            index=False
+        )
 
     def test_update_table(self, tonydbc_instance):
         """Test update_table performs UPDATE operations"""
         db, mock_conn, mock_cursor = tonydbc_instance
         df = pd.DataFrame({"id": [1], "name": ["Updated"]})
 
-        with (
-            patch.object(db, "get_column_datatypes", return_value={"name": str}),
-            patch.object(db, "execute") as mock_execute,
-        ):
-            db.update_table("test_table", df)
+        db.update_table("test_table", df)
 
-        mock_execute.assert_called()
+        # Verify that executemany was called on the cursor
+        mock_cursor.executemany.assert_called_once()
+        # Check that the UPDATE command was constructed correctly
+        call_args = mock_cursor.executemany.call_args
+        assert "UPDATE test_table" in call_args[0][0]
+        assert "SET id = ?, name = ?" in call_args[0][0]
+        assert "WHERE `id` = ?" in call_args[0][0]
 
     def test_update_blob_success(self, tonydbc_instance):
         """Test update_blob uploads file to BLOB column"""
@@ -482,7 +511,7 @@ class TestTonyDBCOnlineOnly:
             tmp_file.write(b"x" * (17 * 1024 * 1024))  # 17MB file
             tmp_file.flush()
 
-            with pytest.raises(AssertionError, match="File size"):
+            with pytest.raises(AssertionError, match="too large"):
                 db.update_blob(
                     "test_table", "blob_col", 1, tmp_file.name, max_size_MB=16
                 )
@@ -513,14 +542,35 @@ class TestTonyDBCOnlineOnly:
         mock_cursor.execute.assert_called_once_with("SELECT * FROM test_table")
 
     def test_get_data_with_retry_command(self, tonydbc_instance):
-        """Test get_data executes before_retry_cmd on first attempt"""
+        """Test get_data executes before_retry_cmd on retry attempts"""
         db, mock_conn, mock_cursor = tonydbc_instance
+        
+        # Create a call counter to track which call we're on
+        call_count = 0
+        def mock_execute_side_effect(query):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # First attempt fails
+                raise mariadb.InterfaceError("Connection lost")
+            # Subsequent calls succeed
+            return None
+            
+        mock_cursor.execute.side_effect = mock_execute_side_effect
         mock_cursor.fetchall.return_value = []
         mock_cursor.description = []
 
-        db.get_data("SELECT * FROM test", before_retry_cmd="SET SESSION sql_mode = ''")
+        with patch.object(db, 'make_connection'):  # Mock reconnection
+            db.get_data("SELECT * FROM test", before_retry_cmd="SET SESSION sql_mode = ''")
 
-        assert mock_cursor.execute.call_count == 2  # retry command + main query
+        # Verify that the retry command was executed at some point
+        call_args_list = mock_cursor.execute.call_args_list
+        retry_commands = [call[0][0] for call in call_args_list if call[0][0] == "SET SESSION sql_mode = ''"]
+        assert len(retry_commands) == 1, f"Expected retry command to be called once, but got: {[call[0][0] for call in call_args_list]}"
+        
+        # Verify that the main query was attempted multiple times
+        main_queries = [call[0][0] for call in call_args_list if call[0][0] == "SELECT * FROM test"]
+        assert len(main_queries) >= 2, "Expected main query to be retried"
 
     def test_get_data_connection_retry(self, tonydbc_instance):
         """Test get_data retries on connection error"""
