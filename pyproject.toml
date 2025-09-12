@@ -34,7 +34,8 @@ dependencies = [
     "tzlocal",
     "paho-mqtt>=1.6.1",
     "filelock",
-    "uuid6"
+    "uuid6",
+    "types-docker"
 ]
 requires-python = ">=3.9,<4.0"
 
