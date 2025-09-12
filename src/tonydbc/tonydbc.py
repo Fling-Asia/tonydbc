@@ -694,7 +694,7 @@ class _TonyDBCOnlineOnly:
 
     def read_dataframe_from_table(
         self, table_name: str, query: str, columns_to_deserialize: list[str] = []
-    ):
+    ) -> pd.DataFrame:
         """Read the dataframe but don't set the index"""
         full_name = ".".join([self.database, table_name])
         df = read_sql_table(name=full_name, con=self, query=query)

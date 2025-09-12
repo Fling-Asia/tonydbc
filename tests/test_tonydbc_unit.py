@@ -513,7 +513,7 @@ class TestTonyDBCOnlineOnly:
         with patch("tonydbc.tonydbc.read_sql_table") as mock_read_sql:
             mock_read_sql.return_value = pd.DataFrame(mock_data)
             result = db.read_dataframe_from_table(
-                table="test_table", query="SELECT * FROM test_table"
+                table_name="test_table", query="SELECT * FROM test_table"
             )
 
         assert isinstance(result, pd.DataFrame)
@@ -934,7 +934,7 @@ class TestTonyDBCOnlineOnly:
         with (
             patch.object(db, "get_primary_key", return_value="id"),
             patch.object(db, "get_column_datatypes", return_value={"name": str}),
-            patch.object(df, "to_sql_fast"),
+            patch("tonydbc.tonydbc.DataFrameFast.to_sql_fast"),
             patch.object(db, "get_data", return_value=[{"id": 1}, {"id": 2}]),
         ):
             result = db.append_to_table("test_table", df, return_reindexed=True)
@@ -947,7 +947,7 @@ class TestTonyDBCOnlineOnly:
         mock_df = pd.DataFrame({"id": [1], "name": ["test"]})
 
         with patch.object(db, "read_dataframe_from_table", return_value=mock_df):
-            result = db.query_table("test_table")
+            result = db.query_table("test_table", "SELECT * FROM test_table")
 
         assert isinstance(result, pd.DataFrame)
 
