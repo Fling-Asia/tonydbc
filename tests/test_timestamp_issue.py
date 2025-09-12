@@ -532,7 +532,7 @@ def test_timestamp_workarounds(setup_tables):
         # Strategy 3: Use Python datetime objects
         print("\n3️⃣ Converting to Python datetime objects...")
         df_dt = base_df.copy()
-        df_dt["file_created_at"] = df_dt["file_created_at"].dt.to_pydatetime()
+        df_dt["file_created_at"] = df_dt["file_created_at"].dt.to_pydatetime().values
         df_dt["video_sequence"] = df_dt["video_sequence"] + 300
 
         try:
