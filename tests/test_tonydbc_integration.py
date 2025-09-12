@@ -38,18 +38,6 @@ from testcontainers.core.container import DockerContainer
 import tonydbc
 
 
-def check_docker_available() -> bool:
-    """Check if Docker is available and running"""
-    try:
-        import docker
-
-        client = docker.from_env()
-        client.ping()
-        return True
-    except Exception:
-        return False
-
-
 def _wait_db(
     host: str, port: int, user: str, pwd: str, db: str, timeout: int = 30
 ) -> None:
@@ -77,8 +65,6 @@ def _wait_db(
 @pytest.fixture(scope="session")
 def mariadb_container() -> Generator[Any, None, None]:
     """Create a MariaDB container for testing"""
-    if not check_docker_available():
-        pytest.skip("Docker not available")
 
     user, pwd, db = "test", "test", "test"
     container = (

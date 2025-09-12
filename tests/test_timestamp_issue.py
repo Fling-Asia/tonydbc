@@ -40,37 +40,6 @@ from testcontainers.core.container import DockerContainer
 import tonydbc
 
 
-# Check if Docker is available and running
-def check_docker_available() -> bool:
-    """Check if Docker is available and running"""
-    try:
-        import docker
-
-        client = docker.from_env()
-        client.ping()
-        return True
-    except Exception as e:
-        return False, str(e)
-
-
-# Run Docker check at module level
-docker_check = check_docker_available()
-if docker_check is not True:
-    error_msg = f"""
-Docker is not running or not available!
-
-Error: {docker_check[1] if isinstance(docker_check, tuple) else "Unknown Docker error"}
-
-To fix this:
-1. Install Docker Desktop from https://www.docker.com/products/docker-desktop/
-2. Start Docker Desktop and wait for it to fully load
-3. Verify with: docker --version && docker ps
-
-These tests require Docker to spin up a MariaDB container for testing.
-"""
-    raise RuntimeError(error_msg)
-
-
 def _wait_db(
     host: str, port: int, user: str, pwd: str, db: str, timeout: int = 120
 ) -> None:
@@ -482,7 +451,7 @@ def test_timestamp_workarounds(setup_tables: Any) -> None:
         print("🔧 TESTING: Timestamp workaround strategies")
         print("=" * 60)
 
-        strategies = []
+        strategies: list[tuple[str, bool, str | None]] = []
 
         # Strategy 1: Convert to string
         print("\n1️⃣ Converting timestamps to strings...")

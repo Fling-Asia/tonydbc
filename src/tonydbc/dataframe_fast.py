@@ -162,17 +162,19 @@ class DataFrameFast(pd.DataFrame):
         # Prepare an INSERT which will populate the real mariadb table with df's data
         # INSERT INTO table(c1,c2,...) VALUES (v11,v12,...), ... (vnn,vn2,...);
         # If index, then we also want the index inserted
-        cols = ([df0.index.name] if index else []) + [str(c) for c in list(df0.columns)]
+        cols: list[str] = ([] if not index else [str(df0.index.name)]) + [
+            str(c) for c in list(df0.columns)
+        ]
         # Sanitize the column names
         cols = [f"`{c}`" for c in cols]
         assert all(isinstance(c, str) for c in cols)
         cmd = (
-            f"INSERT INTO `{name}` ({', '.join(cols)})"
+            f"INSERT INTO `{name}` ({', '.join([str(c) for c in cols])})"
             f" VALUES ({', '.join(['?'] * len(cols))})"
         )
 
         # Double-check that our dataframe does not contain our special csv control characters
-        def has_ctrl_chars(s):
+        def has_ctrl_chars(s: Any) -> bool:
             if isinstance(s, str):
                 return ENCLOSURE_CHAR in s or FIELD_DELIMITER in s
             return False
@@ -217,7 +219,7 @@ class DataFrameFast(pd.DataFrame):
                     ENCLOSED BY %s
                     LINES TERMINATED BY %s
                     IGNORE 1 ROWS
-                    ({", ".join(cols)});
+                    ({", ".join([str(c) for c in cols])});
                 """
 
             with con.cursor() as cursor:
@@ -248,7 +250,7 @@ class DataFrameFast(pd.DataFrame):
             #     be indicated by an indicator."
             MARIADB_NULL = mariadb.constants.INDICATOR.NULL
 
-            def int_converter(v):
+            def int_converter(v: Any) -> Any:
                 if isinstance(v, np.int64):
                     return int(v)
                 else:
@@ -326,17 +328,17 @@ class DataFrameFast(pd.DataFrame):
         Parameters:
             table_name: string.  If None, returns column info for ALL tables.
         """
-        clauses = [f"TABLE_SCHEMA = '{self.database}'"]
+        clauses: list[str] = [f"TABLE_SCHEMA = '{self.database}'"]
         if table_name is not None:
             clauses.append(f"TABLE_NAME = '{table_name}'")
 
-        with self.cursor() as cursor:
-            cursor.execute(
+        with self.cursor() as this_cursor:
+            this_cursor.execute(
                 f"SELECT * FROM INFORMATION_SCHEMA.COLUMNS "
                 f"WHERE {'AND '.join(clauses)};"
             )
-            records = cursor.fetchall()
-            fields = cursor.description
+            records = this_cursor.fetchall()
+            fields = this_cursor.description
 
         # Convert records to list of dicts
         records_dict = [
@@ -376,8 +378,8 @@ def read_sql_table(
 
         for k in bit_cols.keys():
             # Convert b'\x01' to True and b'\x00' to False
-            df[k] = df.apply(
-                lambda v: bool(int.from_bytes(v[k], byteorder="big")), axis=1
+            df[k] = df[k].apply(
+                lambda cell: bool(int.from_bytes(cell, byteorder="big"))
             )
     elif "CALL" not in query.upper():
         # We also have to return the columns names in case records is []

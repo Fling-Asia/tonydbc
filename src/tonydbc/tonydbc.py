@@ -1312,12 +1312,13 @@ class _TonyDBCOnlineOnly:
 
         return df if return_reindexed else None
 
-    def query_table(self, table, query=None):
+    def query_table(self, table, query=None) -> pd.DataFrame:
         """Query a single table and deserialize if necessary"""
+        cols_to_deserialize: list[str]
         if table in self.media_to_deserialize:
-            cols_to_deserialize: list[str] = self.media_to_deserialize[table]
+            cols_to_deserialize = self.media_to_deserialize[table]
         else:
-            cols_to_deserialize: list[str] = []
+            cols_to_deserialize = []
 
         started_at = self.now()
 
@@ -1334,14 +1335,14 @@ class _TonyDBCOnlineOnly:
 
         return cur_df
 
-    def refresh_table(self, table):
+    def refresh_table(self, table) -> None:
         """Load the ENTIRE table which might be highly inefficient
         but for small scales this should be fine.
         """
         cur_df = self.query_table(table)
         setattr(self, f"{table}_df", cur_df)
 
-    def log_to_db(self, log_dict: dict):
+    def log_to_db(self, log_dict: dict) -> None:
         """Save log to database
         This module will get the dictionary of log to print put and add
         to the database 'server_log' table. ALL of the keys need past
@@ -1391,7 +1392,7 @@ class _TonyDBCOnlineOnly:
         payload_size: int,
         num_rows: int,
         num_cols: int,
-    ):
+    ) -> None:
         """Save debugging information about each query that was run"""
         if not self.do_audit:
             return
@@ -1519,28 +1520,29 @@ class TonyDBC(_TonyDBCOnlineOnly):
 
     """
 
-    def __init__(self, *args, **kwargs):
-        mb = "MEDIA_BASE_PATH_PRODUCTION"
+    def __init__(self, *args, **kwargs) -> None:
+        mb: str = "MEDIA_BASE_PATH_PRODUCTION"
+        pickle_base_path: str
         if mb in os.environ:
             pickle_base_path = os.environ[mb]
         else:
             # Default to the script path if no pickle path was provided
             pickle_base_path = sys.path[0]
 
-        self.__offline_status = "online"
-        self.__offline_pickle_path = os.path.join(
+        self.__offline_status: str = "online"
+        self.__offline_pickle_path: str = os.path.join(
             pickle_base_path, "dbcon_pickle.PICKLE"
         )
-        self.__update_queue = queue.Queue()
+        self.__update_queue: queue.Queue = queue.Queue()
         super().__init__(*args, **kwargs)
 
     @property
     @check_connection
-    def is_online(self):
+    def is_online(self) -> bool:
         return self.__offline_status != "offline"
 
     @is_online.setter
-    def is_online(self, value: bool):
+    def is_online(self, value: bool) -> None:
         """If the user sets is_online to True, and it was not before, then flush updates."""
         assert isinstance(value, bool)
         if self.__offline_status == "offline" and value:
@@ -1550,7 +1552,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
         elif self.__offline_status == "online" and not value:
             self.__offline_status = "offline"
 
-    def flush_updates(self):
+    def flush_updates(self) -> None:
         """Make all the updates to the tables that we have been saving up"""
         # Pickle our updates in case of error
         try:
@@ -1608,15 +1610,15 @@ class TonyDBC(_TonyDBCOnlineOnly):
 
         return self
 
-    def pickle_updates(self):
+    def pickle_updates(self) -> None:
         # Pickle our queue
         if not self.__update_queue.empty():
             self.log(
                 f"Pickling {self.__update_queue.qsize()} updates "
                 f"to {self.__offline_pickle_path}"
             )
-            backup_queue = queue.Queue()
-            queue_list = []
+            backup_queue: queue.Queue = queue.Queue()
+            queue_list: list[Any] = []
             while not self.__update_queue.empty():
                 v = self.__update_queue.get()
                 queue_list.append(copy.deepcopy(v))
@@ -1648,31 +1650,31 @@ class TonyDBC(_TonyDBCOnlineOnly):
         super().__exit__(exc_type, exc_val, exc_tb)
         return None
 
-    def start_temp_conn(self):
+    def start_temp_conn(self) -> None:
         if not self.is_online:
             raise AssertionError("start_temp_conn is not supported when not online")
         else:
             super(TonyDBC, self).start_temp_conn()
 
-    def close_temp_conn(self):
+    def close_temp_conn(self) -> None:
         if not self.is_online:
             raise AssertionError("close_temp_conn is not supported when not online")
         else:
             super(TonyDBC, self).close_temp_conn()
 
-    def cursor(self):
+    def cursor(self) -> mariadb.Cursor:
         if not self.is_online:
             raise AssertionError("cursor is not supported when not online")
         else:
             return super(TonyDBC, self).cursor()
 
-    def begin_transaction(self):
+    def begin_transaction(self) -> None:
         if not self.is_online:
             raise AssertionError("begin_transaction is not supported when not online")
         else:
             super(TonyDBC, self).begin_transaction()
 
-    def commit(self):
+    def commit(self) -> None:
         if not self.is_online:
             raise AssertionError("commit is not supported when not online")
         else:
@@ -1684,7 +1686,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
         before_retry_cmd=None,
         no_tracking=False,
         return_type_codes=False,
-    ):
+    ) -> Any:
         if not self.is_online:
             raise AssertionError("get_data can only be used while online")
         else:
@@ -1695,25 +1697,25 @@ class TonyDBC(_TonyDBCOnlineOnly):
                 return_type_codes=return_type_codes,
             )
 
-    def drop_database(self, database):
+    def drop_database(self, database) -> None:
         if not self.is_online:
             raise AssertionError("Cannot drop database if not online")
         else:
             super(TonyDBC, self).drop_database(database)
 
-    def query_table(self, table, query=None):
+    def query_table(self, table, query=None) -> pd.DataFrame:
         if not self.is_online:
             raise AssertionError("Cannot query table if not online")
         else:
             return super(TonyDBC, self).query_table(table, query)
 
-    def refresh_table(self, table):
+    def refresh_table(self, table) -> None:
         if not self.is_online:
             raise AssertionError("Cannot refresh table if not online")
         else:
             super(TonyDBC, self).refresh_table(table)
 
-    def update_table(self, table_name, df):
+    def update_table(self, table_name, df) -> None:
         """Instead of actually updating the table, just enqueue the updates for doing later."""
         kwargs = {"table_name": table_name, "df": df}
         if self.is_online:
@@ -1721,7 +1723,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
         else:
             self.__update_queue.put(("update_table", kwargs))
 
-    def write_dataframe(self, df, table_name, if_exists="replace", index=False):
+    def write_dataframe(self, df, table_name, if_exists="replace", index=False) -> None:
         kwargs = {
             "df": df,
             "table_name": table_name,
@@ -1733,7 +1735,9 @@ class TonyDBC(_TonyDBCOnlineOnly):
         else:
             self.__update_queue.put(("write_dataframe", kwargs))
 
-    def update_blob(self, table_name, blob_column, id_value, filepath, max_size_MB=16):
+    def update_blob(
+        self, table_name, blob_column, id_value, filepath, max_size_MB=16
+    ) -> None:
         kwargs = {
             "table_name": table_name,
             "blob_column": blob_column,
@@ -1746,14 +1750,14 @@ class TonyDBC(_TonyDBCOnlineOnly):
         else:
             self.__update_queue.put(("update_blob", kwargs))
 
-    def post_data(self, query: str):
+    def post_data(self, query: str) -> Any:
         kwargs = {"query": query}
         if self.is_online:
             return super(TonyDBC, self).post_data(**kwargs)
         else:
             self.__update_queue.put(("post_data", kwargs))
 
-    def post_datalist(self, query: str, insert_data: list):
+    def post_datalist(self, query: str, insert_data: list) -> Any:
         kwargs = {
             "query": query,
             "insert_data": insert_data,
@@ -1772,7 +1776,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
         before_retry_cmd=None,
         no_tracking=False,
         log_progress=False,
-    ):
+    ) -> None:
         kwargs = {
             "command": command,
             "command_values": command_values,
@@ -1787,7 +1791,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
 
     def execute_script(
         self, script_path: str, get_return_values=False, cur_database=None
-    ):
+    ) -> Any:
         kwargs = {
             "script_path": script_path,
             "get_return_values": get_return_values,
@@ -1798,7 +1802,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
         else:
             self.__update_queue.put(("execute_script", kwargs))
 
-    def insert_row_all_string(self, table, row_dict):
+    def insert_row_all_string(self, table, row_dict) -> None:
         kwargs = {
             "table": table,
             "row_dict": row_dict,
@@ -1809,7 +1813,9 @@ class TonyDBC(_TonyDBCOnlineOnly):
         else:
             self.__update_queue.put(("insert_row_all_string", kwargs))
 
-    def append_to_table(self, table, df, return_reindexed=False, no_tracking=False):
+    def append_to_table(
+        self, table, df, return_reindexed=False, no_tracking=False
+    ) -> pd.DataFrame | None:
         kwargs = {
             "table": table,
             "df": df,
@@ -1824,8 +1830,9 @@ class TonyDBC(_TonyDBCOnlineOnly):
                     "TonyDBC.append_to_table: cannot return reindexed while in `offline` mode"
                 )
             self.__update_queue.put(("append_to_table", kwargs))
+            return None
 
-    def log_to_db(self, log_dict: dict):
+    def log_to_db(self, log_dict: dict) -> None:
         kwargs = {"log_dict": log_dict}
         if self.is_online:
             super(TonyDBC, self).log_to_db(**kwargs)

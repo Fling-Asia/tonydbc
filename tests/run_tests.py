@@ -18,7 +18,29 @@ from pathlib import Path
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+import docker
 import pytest
+
+
+# Check if Docker is available and running
+def verify_docker_available() -> None:
+    """Check if Docker is available and running"""
+    # Run Docker check at module level
+    try:
+        client = docker.from_env()
+        client.ping()
+    except Exception as e:
+        error_msg = f"""
+    Docker is not running or not available! {e}
+
+    To fix this:
+    1. Install Docker Desktop from https://www.docker.com/products/docker-desktop/
+    2. Start Docker Desktop and wait for it to fully load
+    3. Verify with: docker --version && docker ps
+
+    These tests require Docker to spin up a MariaDB container for testing.
+    """
+        raise RuntimeError(error_msg)
 
 
 def main() -> int:
@@ -54,4 +76,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    verify_docker_available()
     sys.exit(main())
