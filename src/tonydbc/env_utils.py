@@ -17,13 +17,14 @@ common point to prevent messy path finding
 load_dotenvs() is all you need in most cases
 """
 
-import os
-import sys
-import logging
-import dotenv
 import json
+import logging
+import os
 import pathlib
+import sys
 from collections import Counter
+
+import dotenv
 
 # These warnings are very verbose and annoying, so we'll skip them for now
 WARN_MISSING_PATHS = False

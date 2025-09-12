@@ -20,10 +20,8 @@ import tempfile
 import mariadb  # type: ignore
 import numpy as np
 import pandas as pd
-import pytz
 
 from .env_utils import get_env_bool
-from .tony_utils import get_tz_offset
 
 # Map SQL types to Python datatypes
 DATATYPE_MAP = {
@@ -81,7 +79,16 @@ LINE_TERMINATOR = "\n"  # Keep newline as is since the record separator is enoug
 
 
 class DataFrameFast(pd.DataFrame):
-    def to_sql(self, name, con, session_timezone:str, if_exists="append", index=False, *args, **kwargs):  # type: ignore[misc]
+    def to_sql(
+        self,
+        name,
+        con,
+        session_timezone: str,
+        if_exists="append",
+        index=False,
+        *args,
+        **kwargs,
+    ):  # type: ignore[misc]
         if if_exists not in ["replace", "append"]:
             raise AssertionError(
                 "not if_exists in ['replace', 'append'] is not yet impemented"
@@ -130,7 +137,8 @@ class DataFrameFast(pd.DataFrame):
                     # Convert to the correct time zone if necessary
                     .dt.tz_convert(session_timezone)
                     # Convert to a string for mariadb to digest
-                    .dt.strftime("%Y-%m-%d %H:%M:%S.%f").astype("string")
+                    .dt.strftime("%Y-%m-%d %H:%M:%S.%f")
+                    .astype("string")
                 )
 
                 # Directly assign the converted datetime strings without intermediate assignments
@@ -200,9 +208,9 @@ class DataFrameFast(pd.DataFrame):
 
             # Write DataFrame to a CSV file with specified delimiters and text qualifiers
             cmd = f"""
-                LOAD DATA LOCAL INFILE %s 
+                LOAD DATA LOCAL INFILE %s
                     INTO TABLE `{name}`
-                    FIELDS TERMINATED BY %s 
+                    FIELDS TERMINATED BY %s
                     ENCLOSED BY %s
                     LINES TERMINATED BY %s
                     IGNORE 1 ROWS

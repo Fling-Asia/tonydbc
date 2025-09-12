@@ -11,19 +11,21 @@ Support utilities for TonyDBC:
 
 """
 
-import os
-import sys
-import re
 import code
+import datetime
 import json
-import pytz
-import zoneinfo
-import tzlocal
+import os
+import re
+import sys
 import typing
+import zoneinfo
+
+import dateutil
 import numpy as np
 import pandas as pd
-import datetime
-import dateutil
+import pytz
+import tzlocal
+
 from .env_utils import get_env_bool
 
 
@@ -96,7 +98,7 @@ def serialize_table(cur_df, col_dtypes, columns_to_serialize: typing.List[str]):
                 nullable_dtype = "Int32"
             else:
                 nullable_dtype = "Int64"  # Fallback
-            
+
             # Convert to nullable integer type - this properly handles None/NaN as pd.NA
             cur_df[col] = cur_df[col].astype(nullable_dtype)
 

@@ -386,8 +386,12 @@ class _TonyDBCOnlineOnly:
         )
 
         # e.g. '+00:00'
-        actual_time_offset = self.get_data("SELECT @@session.time_zone;")[0]['@@session.time_zone']
-        assert actual_time_offset == self.session_time_offset, f"Actual timezone offset {actual_time_offset} does not match expected timezone offset {self.session_time_offset} of timezone {self.session_timezone}"
+        actual_time_offset = self.get_data("SELECT @@session.time_zone;")[0][
+            "@@session.time_zone"
+        ]
+        assert actual_time_offset == self.session_time_offset, (
+            f"Actual timezone offset {actual_time_offset} does not match expected timezone offset {self.session_time_offset} of timezone {self.session_timezone}"
+        )
 
         return self
 
@@ -397,7 +401,11 @@ class _TonyDBCOnlineOnly:
             self.log("TonyDBC commit pending transactions.")
             self.commit()
         # Only close if connection is still open
-        if hasattr(self, '_mariatonydbcn') and self._mariatonydbcn and not getattr(self._mariatonydbcn, '_closed', True):
+        if (
+            hasattr(self, "_mariatonydbcn")
+            and self._mariatonydbcn
+            and not getattr(self._mariatonydbcn, "_closed", True)
+        ):
             self._mariatonydbcn.close()
             self.log("TonyDBC mariadb connection closed.")
         else:
@@ -560,7 +568,11 @@ class _TonyDBCOnlineOnly:
         """
         df0 = DataFrameFast(df)
         df0.to_sql(
-            name=table_name, con=self._mariatonydbcn, session_timezone=self.session_timezone, if_exists=if_exists, index=index
+            name=table_name,
+            con=self._mariatonydbcn,
+            session_timezone=self.session_timezone,
+            if_exists=if_exists,
+            index=index,
         )
 
     def update_table(self, table_name: str, df):
@@ -1059,7 +1071,7 @@ class _TonyDBCOnlineOnly:
             query=f"""
             SELECT TABLE_NAME, COLUMN_NAME
             FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-            WHERE 
+            WHERE
                 TABLE_SCHEMA = '{self.database}' AND
                 CONSTRAINT_NAME = 'PRIMARY'
             """,
@@ -1170,8 +1182,8 @@ class _TonyDBCOnlineOnly:
         # We must sanitize the values to avoid things like single quotes breaking the INSERT
         # so we will pass a list of values to self.execute instead
         command = f"""
-            INSERT INTO {table} 
-                       ({", ".join(stringified_row_dict.keys())}) 
+            INSERT INTO {table}
+                       ({", ".join(stringified_row_dict.keys())})
                 VALUES ({", ".join(["%s" for _ in stringified_row_dict])})
             """
         command_values = list(map(str, stringified_row_dict.values()))

@@ -2,12 +2,14 @@
 ########################################
 ## TEST HARNESS
 
-import typing
 import os
 import pathlib
+import typing
+
 import pyperclip
-from .tonydbc import TonyDBC
+
 from .tony_utils import prepare_scripts
+from .tonydbc import TonyDBC
 
 
 def create_test_database(
@@ -129,7 +131,7 @@ def create_test_database(
         """
         SQL CODE has been COPIED TO YOUR CLIPBOARD:
 
-        📂 ----> 📚 ---> 🗃️ 
+        📂 ----> 📚 ---> 🗃️
 
         This code runs really slowly and sometimes aborts if we try to run it on
         the weak official mariadb Python connector.
