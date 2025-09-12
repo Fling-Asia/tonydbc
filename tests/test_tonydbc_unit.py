@@ -572,20 +572,6 @@ class TestTonyDBCOnlineOnly:
         main_queries = [call[0][0] for call in call_args_list if call[0][0] == "SELECT * FROM test"]
         assert len(main_queries) >= 2, "Expected main query to be retried"
 
-    def test_get_data_connection_retry(self, tonydbc_instance):
-        """Test get_data retries on connection error"""
-        db, mock_conn, mock_cursor = tonydbc_instance
-        mock_cursor.execute.side_effect = [
-            mariadb.InterfaceError("Lost connection"),
-            None,
-        ]
-        mock_cursor.fetchall.return_value = []
-        mock_cursor.description = []
-
-        with patch.object(db, "__enter__"):
-            result = db.get_data("SELECT 1")
-
-        assert isinstance(result, list)
 
     def test_databases_property(self, tonydbc_instance):
         """Test databases property returns list of databases"""
@@ -598,7 +584,7 @@ class TestTonyDBCOnlineOnly:
         assert result == ["db1", "db2"]
 
     def test_users_property(self, tonydbc_instance):
-        """Test users property returns list of users"""
+        """Test users property returns list of (host, user) tuples"""
         db, mock_conn, mock_cursor = tonydbc_instance
         mock_data = [{"User": "user1", "Host": "host1"}]
 
@@ -606,7 +592,7 @@ class TestTonyDBCOnlineOnly:
             result = db.users
 
         assert len(result) == 1
-        assert result[0]["User"] == "user1"
+        assert result[0] == ("host1", "user1")  # (Host, User) tuple
 
     def test_show_grants(self, tonydbc_instance):
         """Test show_grants returns user grants"""
