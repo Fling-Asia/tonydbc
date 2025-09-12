@@ -248,6 +248,7 @@ class _TonyDBCOnlineOnly:
                 # https://github.com/mariadb-corporation/mariadb-connector-python/blob/f26934540d9506b6079ad92f603b697c761622de/mariadb/mariatonydbcnection.c#L301
                 self._mariatonydbcn = mariadb.connect(
                     host=self.host,
+                    port=self.port,
                     user=self.user,
                     password=self.password,
                     database=self.database,

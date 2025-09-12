@@ -127,7 +127,20 @@ def tonydbc_instance(mariadb_container):
         os.environ[key] = value
 
     try:
-        # Create TonyDBC instance with container connection details
+        # FIRST: Test raw MariaDB connection to make sure container is accessible
+        print("Testing raw MariaDB connection first...")
+        test_conn = mariadb.connect(
+            host=container_host,
+            port=int(container_port),
+            user=mariadb_container.username,
+            password=mariadb_container.password,
+            database=mariadb_container.dbname,
+        )
+        print("✅ Raw MariaDB connection successful!")
+        test_conn.close()
+        
+        # SECOND: Create TonyDBC instance with container connection details
+        print("Creating TonyDBC instance...")
         db_instance = tonydbc.TonyDBC(
             host=container_host,
             port=int(container_port),
@@ -136,6 +149,7 @@ def tonydbc_instance(mariadb_container):
             database=mariadb_container.dbname,
             autocommit=True,
         )
+        print("✅ TonyDBC instance created successfully!")
         yield db_instance
     finally:
         # Restore original environment variables
@@ -189,6 +203,7 @@ def setup_tables(mariadb_container, db_connection, tonydbc_instance):
     code.interact(local=dict(globals(), **locals()))
 
     with tonydbc_instance as db:
+        print("GOT HERE!")
         # Create sortie table
         db.execute("""
             CREATE TABLE IF NOT EXISTS `sortie` (
