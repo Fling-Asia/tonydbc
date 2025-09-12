@@ -70,7 +70,9 @@ def serialize_table(
             # Use Series.apply on the single column to satisfy mypy's overloads
             col_series = cur_df.loc[:, c]
             cur_df.loc[:, c] = col_series.apply(
-                lambda x: None if np.any(pd.isna(x)) else json.dumps(x, cls=NumpyEncoder)
+                lambda x: None
+                if np.any(pd.isna(x))
+                else json.dumps(x, cls=NumpyEncoder)
             )
         except TypeError as e:
             raise TypeError(f"Column {c} could not be serialized; {e}")

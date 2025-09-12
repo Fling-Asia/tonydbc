@@ -52,9 +52,8 @@ import threading
 import time
 import zoneinfo
 from contextlib import contextmanager
-from typing import Any, Callable, Type, Literal, overload
 from types import TracebackType
-from typing import Type
+from typing import Any, Callable, Literal, overload
 
 import dateutil
 import filelock
@@ -362,7 +361,7 @@ class _TonyDBCOnlineOnly:
             )
         elif session_timezone == self.session_timezone:
             self.log(f"session_timezone unchanged at {self.session_timezone}")
-            return
+            return self
         else:
             self.log(
                 f"session_timezone changing from {self.session_timezone} -> {session_timezone}"
@@ -418,7 +417,7 @@ class _TonyDBCOnlineOnly:
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> bool | None:
+    ) -> None:
         # Commit all pending transactions if necessary
         if not self.autocommit:
             self.log("TonyDBC commit pending transactions.")
@@ -455,7 +454,7 @@ class _TonyDBCOnlineOnly:
                 f"TonyDBC: exception triggered __exit__: \n"
                 f"exc_type: {exc_type}\nvalue: {exc_val}\ntraceback: {exc_tb}"
             )
-            return False  # Do not handle the exception; propagate it up
+            return None  # Do not handle the exception; propagate it up
         else:
             self.log("TonyDBC: normal __exit__ successful.")
             # (No need to return a value since `exit_type` is None.)
@@ -1273,10 +1272,11 @@ class _TonyDBCOnlineOnly:
             k: v for k, v in self.get_column_datatypes(table=table).items() if k != pk
         }
 
+        columns_to_serialize: list[str]
         if table in self.media_to_deserialize:
-            columns_to_serialize: list[str] = self.media_to_deserialize[table]
+            columns_to_serialize = self.media_to_deserialize[table]
         else:
-            columns_to_serialize: list[str] = []
+            columns_to_serialize = []
 
         df_serialized = serialize_table(df, col_dtypes, columns_to_serialize)
         payload_info = get_payload_info(df_serialized)
@@ -1310,8 +1310,7 @@ class _TonyDBCOnlineOnly:
                 **payload_info,
             )
 
-        if return_reindexed:
-            return df
+        return df if return_reindexed else None
 
     def query_table(self, table, query=None):
         """Query a single table and deserialize if necessary"""
@@ -1633,7 +1632,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> bool | None:
+    ) -> None:
         self.pickle_updates()
 
         # Clear the queue since we have now archived it
@@ -1647,6 +1646,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
         self.is_online = True
 
         super().__exit__(exc_type, exc_val, exc_tb)
+        return None
 
     def start_temp_conn(self):
         if not self.is_online:
