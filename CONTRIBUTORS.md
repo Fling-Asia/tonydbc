@@ -23,6 +23,12 @@ To publish a new version of tonydbc to PyPI:
 4. Run these commands:
 
 ```bash
+# Static checking and formatting
+mypy .
+ruff check . --fix
+ruff format .
+# Check that all tests have passed
+pytest -s -v -x
 # python -m pip install build twine bumpver
 bumpver update --patch
 python -m build
