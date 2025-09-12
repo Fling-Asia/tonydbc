@@ -8,7 +8,9 @@ and tests inserting data with TIMESTAMP columns to reproduce the error:
 
 import os
 import sys
+import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import mariadb  # type: ignore
 import pandas as pd
@@ -31,12 +33,9 @@ os.environ.setdefault("MYSQL_TEST_DATABASE", "test_db")
 # Add the src directory to the path so we can import tonydbc
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-import tonydbc
+from testcontainers.mysql import MySqlContainer as MariaDbContainer
 
-try:
-    from testcontainers.mariadb import MariaDbContainer  # type: ignore
-except ImportError:
-    from testcontainers.mysql import MySqlContainer as MariaDbContainer  # type: ignore
+import tonydbc
 
 
 # Check if Docker is available and running
@@ -70,11 +69,55 @@ These tests require Docker to spin up a MariaDB container for testing.
     raise RuntimeError(error_msg)
 
 
+def _wait_db(host, port, user, pwd, db, timeout=120):
+    start = time.time()
+    last_err = None
+    while time.time() - start < timeout:
+        try:
+            conn = mariadb.connect(
+                host=host, port=int(port), user=user, password=pwd, database=db
+            )
+            conn.close()
+            return
+        except Exception as e:
+            last_err = e
+            time.sleep(1)
+    raise TimeoutError(f"DB not ready in {timeout}s; last error: {last_err}")
+
+
 @pytest.fixture(scope="session")
 def mariadb_container():
-    """Create a MariaDB container for testing"""
-    with MariaDbContainer("mariadb:11.4") as container:
-        yield container
+    """Create a MariaDB container for testing (no deprecated waits)."""
+    container = (
+        MariaDbContainer("mariadb:11.4")
+        .with_env("MYSQL_ROOT_PASSWORD", "test")
+        .with_env("MYSQL_DATABASE", "test")
+        .with_env("MYSQL_USER", "test")
+        .with_env("MYSQL_PASSWORD", "test")
+    )
+    with container as c:
+        # WE CANNOT USE THIS due to a deprecation warning in testcontainers (as of version 4.13.0)
+        # Wait for the DB to actually be ready
+        # wait_for_logs(container, r"(mariadbd|mysqld): ready for connections\.", timeout=120)
+        # Instead, we "roll our own" wait for the DB to be ready
+
+        host = c.get_container_host_ip()
+        port = int(c.get_exposed_port(3306))
+        user = c.username  # <-- use the container instance
+        pwd = c.password
+        db = c.dbname
+
+        _wait_db(host, port, user, pwd, db, timeout=120)
+
+        # Yield a lightweight handle with the bits your tests use
+        yield SimpleNamespace(
+            get_container_host_ip=lambda: host,
+            get_exposed_port=lambda _p: port,
+            username=user,
+            password=pwd,
+            dbname=db,
+            container=c,  # keep original if you need it
+        )
 
 
 @pytest.fixture(scope="session")
