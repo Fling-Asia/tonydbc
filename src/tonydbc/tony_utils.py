@@ -93,13 +93,14 @@ def serialize_table(
             # Convert to nullable integer type (Int64 for int64, Int32 for int32, etc.)
             target_dtype = dict(col_dtypes)[col]
             if target_dtype is int:
-                nullable_dtype = "Int64"  # Default nullable int
+                # Use pandas nullable integer type
+                nullable_dtype = pd.Int64Dtype()  # Default nullable int
             elif target_dtype is np.int64:
-                nullable_dtype = "Int64"
+                nullable_dtype = pd.Int64Dtype()
             elif target_dtype is np.int32:
-                nullable_dtype = "Int32"
+                nullable_dtype = pd.Int32Dtype()
             else:
-                nullable_dtype = "Int64"  # Fallback
+                nullable_dtype = pd.Int64Dtype()  # Fallback
 
             # Convert to nullable integer type - this properly handles None/NaN as pd.NA
             cur_df[col] = cur_df[col].astype(nullable_dtype)
@@ -343,7 +344,7 @@ def list_to_SQL(v: list[Union[str, int, float]]) -> str:
 
 def list_to_SQL2(col_ids: list[int], column_name: str) -> str:
     """A more advanced version that also uses ranges"""
-    col_ids = np.unique(np.sort(col_ids))  # Sort and remove duplicates
+    col_ids = np.unique(np.sort(col_ids)).tolist()  # Sort and remove duplicates
     diffs = np.diff(col_ids)  # Get the difference between consecutive elements
 
     # Find indices where the difference is greater than 1 (i.e., a break in a range)

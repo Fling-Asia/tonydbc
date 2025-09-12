@@ -132,6 +132,7 @@ class _TonyDBCOnlineOnly:
     port: int
     session_uuid: str
     session_timezone: str
+    ipath: str
     _audit_db: "_TonyDBCOnlineOnly | None"
 
     def __init__(
@@ -152,6 +153,16 @@ class _TonyDBCOnlineOnly:
     ) -> None:
         """
         Parameters:
+            media_to_deserialize: dict of tables with lists of columns to deserialize  e.g.
+                {
+                    "location_image": [
+                        "bounds_i",
+                        "bounds_w",
+                        "bounds_clipped_w",
+                        "big_box_bounds_clipped_i",
+                    ]
+                }
+
             lost_internet_callback: this function will be called if the
                                     connection to the database is lost
                                     while running an SQL command.
@@ -205,10 +216,13 @@ class _TonyDBCOnlineOnly:
                 self.ipath = ipath
             elif ipath != "":
                 self.do_audit = True
-                self.ipath = pathlib.Path(ipath).resolve()
+                self.ipath = str(pathlib.Path(ipath).resolve())
                 # Delete the instrumentation csv file if it has zero size
-                if self.ipath.exists() and self.ipath.stat().st_size == 0:
-                    self.ipath.unlink()
+                if (
+                    pathlib.Path(self.ipath).exists()
+                    and pathlib.Path(self.ipath).stat().st_size == 0
+                ):
+                    pathlib.Path(self.ipath).unlink()
 
     def __enter__(self) -> "_TonyDBCOnlineOnly":
         self.make_connection()
@@ -458,7 +472,7 @@ class _TonyDBCOnlineOnly:
         if not self.using_temp_conn:
             raise AssertionError("You are not using your temporary connection.")
         # Close the temporary connection
-        self.__exit__(exit_type=None, value=None, traceback=None)
+        self.__exit__(None, None, None)  # type: ignore[call-arg]
         # Restore the original connection
         self._mariatonydbcn = self._mariatonydbcn_old
         self.using_temp_conn = False
@@ -611,9 +625,9 @@ class _TonyDBCOnlineOnly:
         }
 
         if table_name in self.media_to_deserialize:
-            columns_to_serialize = self.media_to_deserialize[table_name]
+            columns_to_serialize: list[str] = self.media_to_deserialize[table_name]
         else:
-            columns_to_serialize = []
+            columns_to_serialize: list[str] = []
 
         df_serialized = serialize_table(df, col_dtypes, columns_to_serialize)
 
@@ -716,7 +730,7 @@ class _TonyDBCOnlineOnly:
         before_retry_cmd: str | None = None,
         no_tracking: bool = False,
         return_type_codes: bool = False,
-    ) -> list[dict[str, Any]]:
+    ) -> list[dict[str, Any]] | tuple[list[dict[Any, Any]], dict[Any, str]]:
         if self.do_audit and not no_tracking:
             started_at = self.now()
 
@@ -1240,9 +1254,9 @@ class _TonyDBCOnlineOnly:
         }
 
         if table in self.media_to_deserialize:
-            columns_to_serialize = self.media_to_deserialize[table]
+            columns_to_serialize: list[str] = self.media_to_deserialize[table]
         else:
-            columns_to_serialize = []
+            columns_to_serialize: list[str] = []
 
         df_serialized = serialize_table(df, col_dtypes, columns_to_serialize)
         payload_info = get_payload_info(df_serialized)
@@ -1282,9 +1296,9 @@ class _TonyDBCOnlineOnly:
     def query_table(self, table, query=None):
         """Query a single table and deserialize if necessary"""
         if table in self.media_to_deserialize:
-            cols_to_deserialize = self.media_to_deserialize[table]
+            cols_to_deserialize: list[str] = self.media_to_deserialize[table]
         else:
-            cols_to_deserialize = []
+            cols_to_deserialize: list[str] = []
 
         started_at = self.now()
 
@@ -1408,13 +1422,14 @@ class _TonyDBCOnlineOnly:
         # then write to a file please
         if str(self.ipath) != "database":
             self.log("SAVING LOCK PATH")
-            lock_path = self.ipath.with_suffix(self.ipath.suffix + ".lock")
+            ipath_path = pathlib.Path(self.ipath)
+            lock_path = ipath_path.with_suffix(ipath_path.suffix + ".lock")
             with filelock.FileLock(lock_path):
                 try:
                     df.to_csv(
-                        self.ipath,
+                        str(self.ipath),
                         mode="a",
-                        header=(not self.ipath.exists()),
+                        header=(not ipath_path.exists()),
                         index=False,
                     )
                 except PermissionError as e:
