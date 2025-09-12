@@ -390,9 +390,12 @@ def read_sql_table(
         """
         with con.cursor() as cursor:
             cursor.execute(query)
-            # records0 = cursor.fetchall()
             # Get the field names - we don't need the records for this case
-            cursor.execute(query + " LIMIT 0")
+            q0 = query.strip().rstrip(";")
+            if " LIMIT " in q0.upper():
+                cursor.execute(q0)
+            else:
+                cursor.execute(q0 + " LIMIT 0;")
             columns = [v[0] for v in cursor.description]
 
         df = DataFrameFast(columns=columns)

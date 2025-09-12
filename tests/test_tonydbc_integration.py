@@ -238,6 +238,78 @@ class TestTonyDBCIntegration:
         assert "Bob" in result_df["name"].values
         assert "Charlie" in result_df["name"].values
 
+    def test_append_to_table_real_db(self, setup_tables):
+        """Append rows and verify persisted results"""
+        db = setup_tables
+
+        # Start from a clean slate
+        db.execute("DELETE FROM test_table;")
+
+        df = pd.DataFrame(
+            {
+                "name": ["Alpha", "Beta"],
+                "email": ["alpha@test.com", "beta@test.com"],
+            }
+        )
+
+        db.append_to_table("test_table", df)
+
+        rows = db.get_data("SELECT name, email FROM test_table ORDER BY name;")
+        assert [(r["name"], r["email"]) for r in rows] == [
+            ("Alpha", "alpha@test.com"),
+            ("Beta", "beta@test.com"),
+        ]
+
+    def test_read_dataframe_from_table_real_db(self, setup_tables):
+        """Read DataFrame using explicit query and verify shape"""
+        db = setup_tables
+
+        # Ensure at least one row exists
+        db.execute(
+            "INSERT INTO test_table (name, email) VALUES ('Zed', 'zed@test.com')"
+        )
+
+        df = db.read_dataframe_from_table(
+            table_name="test_table", query="SELECT id, name, email FROM test_table;"
+        )
+        assert isinstance(df, pd.DataFrame)
+        # Primary key is intentionally set as index when named 'id'
+        assert df.index.name == "id"
+        assert set(["name", "email"]).issubset(set(df.columns))
+
+    def test_update_table_real_db(self, setup_tables):
+        """Update rows via DataFrame indexed by PK and verify changes"""
+        db = setup_tables
+
+        # Seed two rows
+        db.execute("DELETE FROM test_table;")
+        db.execute(
+            "INSERT INTO test_table (name, email) VALUES ('U1', 'u1@test.com'), ('U2', 'u2@test.com')"
+        )
+        rows = db.get_data("SELECT id, name, email FROM test_table ORDER BY id;")
+        ids = [r["id"] for r in rows]
+
+        # Build update dataframe indexed by PK
+        upd = pd.DataFrame({"name": ["U1x", "U2y"], "email": ["x@test.com", "y@test.com"]})
+        upd.index = ids
+        upd.index.name = "id"
+
+        db.update_table("test_table", upd)
+
+        rows2 = db.get_data("SELECT id, name, email FROM test_table ORDER BY id;")
+        assert [(r["name"], r["email"]) for r in rows2] == [
+            ("U1x", "x@test.com"),
+            ("U2y", "y@test.com"),
+        ]
+
+    def test_query_table_real_db(self, setup_tables):
+        """Query with explicit SQL and verify returned DataFrame"""
+        db = setup_tables
+        df = db.query_table("test_table", "SELECT id, name FROM test_table LIMIT 1;")
+        # 'id' is used as index by design
+        assert df.index.name == "id"
+        assert "name" in df.columns
+
     @pytest.mark.skip(reason="Temporarily skipped due to 'replace' handling semantics")
     def test_write_dataframe_integration_results(self, setup_tables):
         """End-to-end: write_dataframe persists rows and values correctly"""
