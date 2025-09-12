@@ -235,6 +235,8 @@ class _TonyDBCOnlineOnly:
             # Initialize the audit connection
             self._audit_db.__enter__()
 
+        return self
+
     def make_connection(self) -> None:
         self.log(f"Connecting to database {self.database} on {self.host}.")
         num_attempts = MAX_RECONNECTION_ATTEMPTS
