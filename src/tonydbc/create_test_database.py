@@ -4,7 +4,6 @@
 
 import os
 import pathlib
-import typing
 
 import pyperclip
 
@@ -15,13 +14,13 @@ from .tonydbc import TonyDBC
 def create_test_database(
     test_db: str,
     source_db: str,
-    schema_filepaths: typing.List[str],
-    tables_to_copy: typing.Dict[str, int],
-    custom_commands: typing.List[str],
+    schema_filepaths: list[str],
+    tables_to_copy: dict[str, int],
+    custom_commands: list[str],
     host: str,
     user: str,
     password: str,
-    users_to_grant: typing.List[str],
+    users_to_grant: list[str],
 ) -> None:
     """
     Drops the test_db, recreates all tables, copies the data from a source_db.

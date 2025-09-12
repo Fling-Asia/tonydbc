@@ -52,7 +52,7 @@ import threading
 import time
 import zoneinfo
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, Callable, Type
 
 import dateutil
 import filelock
@@ -98,8 +98,8 @@ def get_currentframe_method() -> str:
         return "unknown"
 
 
-def check_connection(fn):
-    def conn_wrapper(self, *args, **kwargs):
+def check_connection(fn: Callable) -> Callable:
+    def conn_wrapper(self: "_TonyDBCOnlineOnly", *args: Any, **kwargs: Any) -> Any:
         try:
             self._mariatonydbcn.ping()
         except mariadb.Error:
@@ -136,20 +136,20 @@ class _TonyDBCOnlineOnly:
 
     def __init__(
         self,
-        host=None,
-        user=None,
-        password=None,
-        database=None,
-        port=3306,
-        media_to_deserialize=[],
-        autocommit=True,
-        logger_instance=None,
-        prefix="",
-        lost_connection_callback=None,
-        session_timezone=None,
-        interact_after_error=False,
-        force_no_audit=False,
-    ):
+        host: str | None = None,
+        user: str | None = None,
+        password: str | None = None,
+        database: str | None = None,
+        port: int = 3306,
+        media_to_deserialize: list[str] = [],
+        autocommit: bool = True,
+        logger_instance: Any | None = None,
+        prefix: str = "",
+        lost_connection_callback: Callable | None = None,
+        session_timezone: str | None = None,
+        interact_after_error: bool = False,
+        force_no_audit: bool = False,
+    ) -> None:
         """
         Parameters:
             lost_internet_callback: this function will be called if the
@@ -210,7 +210,7 @@ class _TonyDBCOnlineOnly:
                 if self.ipath.exists() and self.ipath.stat().st_size == 0:
                     self.ipath.unlink()
 
-    def __enter__(self):
+    def __enter__(self) -> "_TonyDBCOnlineOnly":
         self.make_connection()
 
         if self.do_audit:
@@ -235,7 +235,7 @@ class _TonyDBCOnlineOnly:
             # Initialize the audit connection
             self._audit_db.__enter__()
 
-    def make_connection(self):
+    def make_connection(self) -> None:
         self.log(f"Connecting to database {self.database} on {self.host}.")
         num_attempts = MAX_RECONNECTION_ATTEMPTS
         while True:
@@ -324,7 +324,7 @@ class _TonyDBCOnlineOnly:
 
             self.execute(cmd, no_tracking=True)
 
-    def set_timezone(self, session_timezone=None):
+    def set_timezone(self, session_timezone: str | None = None) -> None:
         """
         Set the IANA session time zone for display and input purposes for TIMEZONE fields
         e.g. session_timezone = "Asia/Bangkok" => session_time_offset = "+07:00"
@@ -395,7 +395,12 @@ class _TonyDBCOnlineOnly:
 
         return self
 
-    def __exit__(self, exit_type, value, traceback):
+    def __exit__(
+        self,
+        exit_type: Type[BaseException] | None,
+        value: BaseException | None,
+        traceback: Any | None,
+    ) -> None:
         # Commit all pending transactions if necessary
         if not self.autocommit:
             self.log("TonyDBC commit pending transactions.")
@@ -437,7 +442,7 @@ class _TonyDBCOnlineOnly:
             self.log("TonyDBC: normal __exit__ successful.")
             # (No need to return a value since `exit_type` is None.)
 
-    def start_temp_conn(self):
+    def start_temp_conn(self) -> None:
         """Start using a temporary database connection"""
         if self.using_temp_conn:
             raise AssertionError("You are already using your temporary connection.")
@@ -446,7 +451,7 @@ class _TonyDBCOnlineOnly:
         # Create a new connection
         self.__enter__()
 
-    def close_temp_conn(self):
+    def close_temp_conn(self) -> None:
         """Stop using the temporary database connection"""
         if not self.using_temp_conn:
             raise AssertionError("You are not using your temporary connection.")
@@ -456,13 +461,13 @@ class _TonyDBCOnlineOnly:
         self._mariatonydbcn = self._mariatonydbcn_old
         self.using_temp_conn = False
 
-    def now(self):
+    def now(self) -> pd.Timestamp:
         return pd.Timestamp.now(tz=self.session_timezone)
 
-    def cursor(self):
+    def cursor(self) -> mariadb.Cursor:
         return self._mariatonydbcn.cursor()
 
-    def begin_transaction(self):
+    def begin_transaction(self) -> None:
         """This must be followed by a commit later.  Turns off autocommit."""
         # We must ensure autocommit is not on to be able to create a transaction
         if self.autocommit:
@@ -470,7 +475,7 @@ class _TonyDBCOnlineOnly:
 
         self._mariatonydbcn.begin()
 
-    def commit(self):
+    def commit(self) -> None:
         try:
             self._mariatonydbcn.commit()
         except mariadb.InterfaceError as e:
@@ -500,7 +505,7 @@ class _TonyDBCOnlineOnly:
         else:
             self._l.info(msg)
 
-    def column_info(self, table_name=None):
+    def column_info(self, table_name: str | None = None) -> pd.DataFrame:
         """Returns the column information.
         Parameters:
             table_name: string.  If None, returns column info for ALL tables.
@@ -521,7 +526,7 @@ class _TonyDBCOnlineOnly:
         return pd.DataFrame(r)
 
     @property
-    def last_insert_id(self):
+    def last_insert_id(self) -> int:
         """Get the last insert ID from the main connection.
 
         Note: This is now stable even when audit is enabled, because audit operations
@@ -531,7 +536,7 @@ class _TonyDBCOnlineOnly:
         data = self.get_data("SELECT LAST_INSERT_ID() AS id;", no_tracking=True)
         return data[0]["id"]
 
-    def use(self, new_database: str):
+    def use(self, new_database: str) -> None:
         """Change databases"""
         self.database = new_database
         # Reset current connections
@@ -706,10 +711,10 @@ class _TonyDBCOnlineOnly:
     def get_data(
         self,
         query: str,
-        before_retry_cmd=None,
-        no_tracking=False,
-        return_type_codes=False,
-    ):
+        before_retry_cmd: str | None = None,
+        no_tracking: bool = False,
+        return_type_codes: bool = False,
+    ) -> list[dict[str, Any]]:
         if self.do_audit and not no_tracking:
             started_at = self.now()
 
@@ -865,7 +870,7 @@ class _TonyDBCOnlineOnly:
 
         return record
 
-    def post_datalist(self, query: str, insert_data: list):
+    def post_datalist(self, query: str, insert_data: list[Any]) -> Any:
         with self.cursor() as cursor:
             record = cursor.executemany(query, insert_data)
         return record
@@ -873,11 +878,11 @@ class _TonyDBCOnlineOnly:
     def execute(
         self,
         command: str,
-        command_values=None,
-        before_retry_cmd=None,
-        no_tracking=False,
-        log_progress=False,
-    ):
+        command_values: tuple | None = None,
+        before_retry_cmd: str | None = None,
+        no_tracking: bool = False,
+        log_progress: bool = False,
+    ) -> None:
         """Parameters:
         command_values: a tuple of values [optional]
         """
@@ -1091,7 +1096,7 @@ class _TonyDBCOnlineOnly:
             self.refresh_primary_keys()
             return self._primary_keys
 
-    def get_column_datatypes(self, table: str):
+    def get_column_datatypes(self, table: str) -> dict[str, Any]:
         try:
             return self.column_datatypes[table]
         except KeyError:
@@ -1212,7 +1217,13 @@ class _TonyDBCOnlineOnly:
             # Drop the temporary table when the context ends
             self.execute(f"DROP TEMPORARY TABLE IF EXISTS {temp_table_name};")
 
-    def append_to_table(self, table, df, return_reindexed=False, no_tracking=False):
+    def append_to_table(
+        self,
+        table: str,
+        df: pd.DataFrame,
+        return_reindexed: bool = False,
+        no_tracking: bool = False,
+    ) -> pd.DataFrame | None:
         if self.do_audit and not no_tracking:
             started_at = self.now()
 

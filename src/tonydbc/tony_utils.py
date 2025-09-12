@@ -17,8 +17,8 @@ import json
 import os
 import re
 import sys
-import typing
 import zoneinfo
+from typing import Any, Union
 
 import dateutil
 import numpy as np
@@ -31,7 +31,7 @@ from .env_utils import get_env_bool
 
 # A custom encoder to handle np.int64 and other non-serializable types
 class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
+    def default(self, obj: Any) -> Any:
         if isinstance(obj, np.integer):
             return int(obj)  # Convert any numpy integer to Python int
         if isinstance(obj, np.floating):
@@ -48,7 +48,9 @@ class NumpyEncoder(json.JSONEncoder):
         return super(NumpyEncoder, self).default(obj)
 
 
-def serialize_table(cur_df, col_dtypes, columns_to_serialize: typing.List[str]):
+def serialize_table(
+    cur_df: pd.DataFrame, col_dtypes: dict[str, Any], columns_to_serialize: list[str]
+) -> pd.DataFrame:
     # If we don't make a copy, we will create side effects in the original cur_df
     cur_df = cur_df.copy()
 
@@ -124,8 +126,8 @@ def serialize_table(cur_df, col_dtypes, columns_to_serialize: typing.List[str]):
 
 
 def deserialize_table(
-    cur_df, columns_to_deserialize: typing.List[str], session_timezone
-):
+    cur_df: pd.DataFrame, columns_to_deserialize: list[str], session_timezone: str
+) -> pd.DataFrame:
     if len(cur_df) == 0:
         return cur_df
 
@@ -207,7 +209,7 @@ def set_MYSQL_DATABASE(
     use_production_database: bool = get_env_bool("USE_PRODUCTION_DATABASE"),
     mysql_production_database: str = os.environ["MYSQL_PRODUCTION_DATABASE"],
     mysql_test_database: str = os.environ["MYSQL_TEST_DATABASE"],
-):
+) -> None:
     """Set the MYSQL_DATABASE environment variable"""
     # If it's already been set, don't take any action
     # (this applies to our docker containers, which have it pre-set)
@@ -222,8 +224,8 @@ def set_MYSQL_DATABASE(
 
 
 def iso_timestamp_to_utc(
-    iso_timestamp_string,
-):
+    iso_timestamp_string: str,
+) -> str:
     """e.g. converts an ISO-formatted string to UTC which is useful
     when adding to a mariadb TIMESTAMP which has no timezone awareness
     e.g. "2023-03-03T09:00:00+07:00" ->
@@ -238,7 +240,7 @@ def iso_timestamp_to_utc(
         return iso_ts.strftime("%Y-%m-%d %H:%M:%S")
 
 
-def get_tz_offset(iana_tz=None):
+def get_tz_offset(iana_tz: str | None = None) -> str:
     """Converts IANA Time Zone to offset string
     e.g.  'Asia/Bangkok' -> '+07:00'
 
@@ -255,12 +257,12 @@ def get_tz_offset(iana_tz=None):
     return offset_str
 
 
-def validate_tz_offset(iana_tz, tz_offset):
+def validate_tz_offset(iana_tz: str, tz_offset: str) -> None:
     """e.g. Validates that '07:00' is the correct offset from UTC for 'Asia/Bangkok'"""
     assert get_tz_offset(iana_tz) == tz_offset
 
 
-def get_next_word_after_from(input_string):
+def get_next_word_after_from(input_string: str) -> str | None:
     """Help to find the table name after FROM"""
 
     # Convert the input string to uppercase for case-insensitive search
@@ -278,7 +280,7 @@ def get_next_word_after_from(input_string):
         return None
 
 
-def get_payload_info(payload):
+def get_payload_info(payload: Any) -> dict[str, int]:
     """Get the size of a payload, which can be a dataframe or nested iterables of various kinds"""
     payload_size = sys.getsizeof(payload)
     if payload is None:
@@ -305,7 +307,7 @@ def get_payload_info(payload):
     }
 
 
-def prepare_scripts(test_db: str, schema_filepaths: typing.List[str]):
+def prepare_scripts(test_db: str, schema_filepaths: list[str]) -> str:
     """Return a string consisting of all the contents of the scripts provided
 
     Parameters:
@@ -330,7 +332,7 @@ def prepare_scripts(test_db: str, schema_filepaths: typing.List[str]):
 
 # This might be quite a large string but hopefully SQL doesn't choke
 # Convert a list [1,2,3] into string "(1,2,3)"
-def list_to_SQL(v):
+def list_to_SQL(v: list[Union[str, int, float]]) -> str:
     if all(isinstance(k, str) for k in v):
         return "(" + ",".join([f"'{k}'" for k in v]) + ")"
     elif all(not isinstance(k, str) for k in v):
@@ -339,7 +341,7 @@ def list_to_SQL(v):
         raise AssertionError(f"Elements in the list are of mixed type: {v}")
 
 
-def list_to_SQL2(col_ids, column_name):
+def list_to_SQL2(col_ids: list[int], column_name: str) -> str:
     """A more advanced version that also uses ranges"""
     col_ids = np.unique(np.sort(col_ids))  # Sort and remove duplicates
     diffs = np.diff(col_ids)  # Get the difference between consecutive elements

@@ -1,6 +1,7 @@
 import datetime
 import json
 import uuid
+from typing import Any
 
 from paho.mqtt import client as mqtt
 
@@ -17,10 +18,10 @@ class MQTTClient:
         host: str,
         user: str,
         password: str,
-        subscribed_topics,
+        subscribed_topics: list[str],
         client_id: str = "MQTTClient_name",
         port: int = 1883,
-    ):
+    ) -> None:
         self.MQTT_host = host
         self.MQTT_user = user
         self.MQTT_password = password
@@ -30,7 +31,7 @@ class MQTTClient:
 
         assert len(self.MQTT_subscribed_topics) > 0
 
-    def __enter__(self):
+    def __enter__(self) -> "MQTTClient":
         print(f"MQTT client_id {self.MQTTClient_id}: __enter__")
         print(f"Subscribed topics: {self.MQTT_subscribed_topics}")
 
@@ -57,11 +58,13 @@ class MQTTClient:
 
         return self
 
-    def __exit__(self, exit_type, value, traceback):
+    def __exit__(
+        self, exit_type: type | None, value: BaseException | None, traceback: Any | None
+    ) -> None:
         print(f"EXIT DIPS_MQTT_Logger {self.MQTTClient_id}")
         self.__mqtt_client.disconnect()
 
-    def loop_forever(self):
+    def loop_forever(self) -> None:
         """Start a blocking form of the network loop.
         Automatically handles reconnect.
 
@@ -70,7 +73,7 @@ class MQTTClient:
         """
         self.__mqtt_client.loop_forever()
 
-    def publish(self, topic, message, verbose=False):
+    def publish(self, topic: str, message: str, verbose: bool = False) -> None:
         # Publish the message
         res = self.__mqtt_client.publish(topic, message)
         if res.rc == mqtt.MQTT_ERR_SUCCESS:
@@ -79,7 +82,9 @@ class MQTTClient:
         else:
             raise IOError(f"MQTT publish on topic {topic} failed with rc={res.rc}.")
 
-    def on_connect(self, client, userdata, flags, rc):
+    def on_connect(
+        self, client: mqtt.Client, userdata: Any, flags: dict, rc: int
+    ) -> None:
         # The callback for when the client receives a
         # CONNACK ("Connection Acknowledge") response from the server.
         msg = f"{str(self.now_utc)} | {self.MQTTClient_id} | INFO | Connected to MQTT server: "
@@ -92,7 +97,7 @@ class MQTTClient:
         for topic in self.MQTT_subscribed_topics:
             self.__mqtt_client.subscribe(topic)
 
-    def on_disconnect(self, client, userdata, rc):
+    def on_disconnect(self, client: mqtt.Client, userdata: Any, rc: int) -> None:
         assert client == self.__mqtt_client
         if rc == mqtt.MQTT_ERR_SUCCESS:
             print("Disconnection (expected) of with rc = mqtt.MQTT_ERR_SUCCESS.")
@@ -106,7 +111,9 @@ class MQTTClient:
                     f"Unexpected disconnection rc={rc}.  Hopefully reconnection will occur automatically."
                 )
 
-    def on_message(self, client, userdata, message):
+    def on_message(
+        self, client: mqtt.Client, userdata: Any, message: mqtt.MQTTMessage
+    ) -> None:
         """Receive MQTT message
 
         This method should be overridden by a child class
@@ -133,9 +140,9 @@ class MQTTClient:
             print(f"{self.now_utc_string} | ERROR | No message received??")
 
     @property
-    def now_utc(self):
+    def now_utc(self) -> datetime.datetime:
         return datetime.datetime.now(datetime.timezone.utc)
 
     @property
-    def now_utc_string(self):
+    def now_utc_string(self) -> str:
         return self.now_utc.strftime("%Y-%m-%dT%H:%M:%S%z")

@@ -11,6 +11,7 @@ import sys
 import time
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, Generator
 
 import mariadb  # type: ignore
 import pandas as pd
@@ -40,7 +41,7 @@ import tonydbc
 
 
 # Check if Docker is available and running
-def check_docker_available():
+def check_docker_available() -> bool:
     """Check if Docker is available and running"""
     try:
         import docker
@@ -70,7 +71,9 @@ These tests require Docker to spin up a MariaDB container for testing.
     raise RuntimeError(error_msg)
 
 
-def _wait_db(host, port, user, pwd, db, timeout=120):
+def _wait_db(
+    host: str, port: int, user: str, pwd: str, db: str, timeout: int = 120
+) -> None:
     start = time.time()
     last_err = None
     while time.time() - start < timeout:
@@ -87,7 +90,7 @@ def _wait_db(host, port, user, pwd, db, timeout=120):
 
 
 @pytest.fixture(scope="session")
-def mariadb_container():
+def mariadb_container() -> Generator[Any, None, None]:
     """Create a MariaDB container for testing (no deprecated waits)."""
     user = pwd = "test"
     db = "test"
@@ -122,7 +125,7 @@ def mariadb_container():
 
 
 @pytest.fixture(scope="session")
-def tonydbc_instance(mariadb_container):
+def tonydbc_instance(mariadb_container: Any) -> Any:
     """Create a TonyDBC instance connected to the test container"""
     # Get the actual container connection details
     container_host = mariadb_container.get_container_host_ip()
@@ -189,7 +192,9 @@ def tonydbc_instance(mariadb_container):
 
 
 @pytest.fixture(scope="session")
-def setup_tables(mariadb_container, tonydbc_instance):
+def setup_tables(
+    mariadb_container: Any, tonydbc_instance: Any
+) -> Generator[Any, None, None]:
     """Set up the required tables for testing"""
 
     # Get the actual container connection details
@@ -312,7 +317,9 @@ def setup_tables(mariadb_container, tonydbc_instance):
         yield db
 
 
-def create_test_video_dataframe(num_rows=5, base_sequence=1):
+def create_test_video_dataframe(
+    num_rows: int = 5, base_sequence: int = 1
+) -> pd.DataFrame:
     """Create a test DataFrame with video data including timestamp columns"""
 
     # Create various timestamp formats to test
@@ -352,7 +359,7 @@ def create_test_video_dataframe(num_rows=5, base_sequence=1):
     return df
 
 
-def test_database_setup(setup_tables):
+def test_database_setup(setup_tables: Any) -> None:
     """Test that the database is properly set up with data"""
 
     with setup_tables as db:
@@ -386,7 +393,7 @@ def test_database_setup(setup_tables):
         print(f"   - Machines: {len(machines)}")
 
 
-def test_dataframe_creation():
+def test_dataframe_creation() -> None:
     """Test that our test DataFrame is created correctly"""
 
     df = create_test_video_dataframe(num_rows=3)
@@ -414,7 +421,7 @@ def test_dataframe_creation():
     print(f"   - Sample timestamp: {df['file_created_at'].iloc[0]}")
 
 
-def test_timestamp_data_insertion(setup_tables):
+def test_timestamp_data_insertion(setup_tables: Any) -> None:
     """Test pandas timestamp data insertion and data quality"""
 
     with setup_tables as db:
@@ -465,7 +472,7 @@ def test_timestamp_data_insertion(setup_tables):
         print("✅ All data quality checks passed!")
 
 
-def test_timestamp_workarounds(setup_tables):
+def test_timestamp_workarounds(setup_tables: Any) -> None:
     """Test different strategies for handling timestamp data"""
 
     with setup_tables as db:
@@ -602,7 +609,7 @@ def test_timestamp_workarounds(setup_tables):
         assert len(strategies) > 0, "No strategies were tested"
 
 
-def test_column_type_inspection(setup_tables):
+def test_column_type_inspection(setup_tables: Any) -> None:
     """Inspect what types are being sent to MariaDB"""
 
     with setup_tables as db:

@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 import pytest
 
 
-def main():
+def main() -> int:
     """Run the timestamp tests"""
     print("🚀 Starting TonyDBC Timestamp Issue Tests with TestContainers")
     print("=" * 70)

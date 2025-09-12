@@ -16,6 +16,7 @@ import code
 import csv
 import os
 import tempfile
+from typing import Any
 
 import mariadb  # type: ignore
 import numpy as np
@@ -81,14 +82,14 @@ LINE_TERMINATOR = "\n"  # Keep newline as is since the record separator is enoug
 class DataFrameFast(pd.DataFrame):
     def to_sql(
         self,
-        name,
-        con,
+        name: str,
+        con: mariadb.Connection,
         session_timezone: str,
-        if_exists="append",
-        index=False,
-        *args,
-        **kwargs,
-    ):  # type: ignore[misc]
+        if_exists: str = "append",
+        index: bool = False,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:  # type: ignore[misc]
         if if_exists not in ["replace", "append"]:
             raise AssertionError(
                 "not if_exists in ['replace', 'append'] is not yet impemented"
@@ -317,7 +318,7 @@ class DataFrameFast(pd.DataFrame):
                     for v in table_data_bad:
                         cursor.execute(cmd, v)
 
-    def column_info(self, table_name=None):
+    def column_info(self, table_name: str | None = None) -> pd.DataFrame:
         """Returns the column information.
         Parameters:
             table_name: string.  If None, returns column info for ALL tables.
@@ -343,7 +344,13 @@ class DataFrameFast(pd.DataFrame):
         return pd.DataFrame(records_dict)
 
 
-def read_sql_table(name, con, query=None, *args, **kwargs):
+def read_sql_table(
+    name: str,
+    con: mariadb.Connection,
+    query: str | None = None,
+    *args: Any,
+    **kwargs: Any,
+) -> pd.DataFrame:
     """A drop-in replacement for pd.read_sql_table
     Note: this does not set an index.
     """

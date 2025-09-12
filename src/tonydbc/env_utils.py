@@ -33,15 +33,15 @@ WARN_MISSING_PATHS = False
 # We need this to capture the logging warning
 # "Python-dotenv could not parse statement starting at line 1"
 class CaptureLogsHandler(logging.Handler):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.messages = []
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         self.messages.append(record.getMessage())
 
 
-def check_duplicate_keys(dotenv_path):
+def check_duplicate_keys(dotenv_path: str) -> None:
     # Load key-value pairs from the .env file
     # env_dict = dotenv.dotenv_values(dotenv_path)  # Not currently used but may be useful for debugging
 
@@ -65,7 +65,7 @@ def check_duplicate_keys(dotenv_path):
         )
 
 
-def check_environment_variable_integrity(env_filepath):
+def check_environment_variable_integrity(env_filepath: str) -> None:
     # Validate that the .env file has all the latest environment variables
     assert env_filepath.endswith(".env")
 
@@ -149,7 +149,7 @@ def check_environment_variable_integrity(env_filepath):
                 )
 
 
-def get_env_bool(key):
+def get_env_bool(key: str) -> bool:
     """Handles the case of a boolean environment variable"""
     if key not in os.environ:
         raise KeyError(f"No environment variable '{key}' was found.")
@@ -164,7 +164,7 @@ def get_env_bool(key):
     return os.environ[key] == "True"
 
 
-def get_env_list(key):
+def get_env_list(key: str) -> list[str]:
     """Parse a list of strings from an environment variable
 
     Returns:
@@ -222,7 +222,7 @@ def get_env_list(key):
     return v_list
 
 
-def load_dotenvs():
+def load_dotenvs() -> list[str]:
     """
     A more powerful version of `dotenv.load_dotenv`.  It will:
         - Load the .env file in the script's path, if any
