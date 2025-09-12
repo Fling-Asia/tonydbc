@@ -693,7 +693,7 @@ class _TonyDBCOnlineOnly:
         )
 
     def read_dataframe_from_table(
-        self, table_name, columns_to_deserialize=[], query=None
+        self, table_name:str, columns_to_deserialize:list[str] = [], query:str | None = None
     ):
         """Read the dataframe but don't set the index"""
         full_name = ".".join([self.database, table_name])
@@ -1312,7 +1312,7 @@ class _TonyDBCOnlineOnly:
 
         return df if return_reindexed else None
 
-    def query_table(self, table, query=None) -> pd.DataFrame:
+    def query_table(self, table:str, query:str | None = None) -> pd.DataFrame:
         """Query a single table and deserialize if necessary"""
         cols_to_deserialize: list[str]
         if table in self.media_to_deserialize:

@@ -179,7 +179,7 @@ class DataFrameFast(pd.DataFrame):
                 return ENCLOSURE_CHAR in s or FIELD_DELIMITER in s
             return False
 
-        df_has_ctrl_chars = df0.map(has_ctrl_chars).values.any()
+        df_has_ctrl_chars = df0.applymap(has_ctrl_chars).values.any()
 
         if len(df0) == 0:
             # Nothing to INSERT
@@ -322,6 +322,26 @@ class DataFrameFast(pd.DataFrame):
                 if len(table_data_bad) > 0:
                     for v in table_data_bad:
                         cursor.execute(cmd, v)
+
+    def to_sql(  # type: ignore[override]
+        self,
+        name: str,
+        con: Any,
+        session_timezone: str,
+        if_exists: str = "append",
+        index: bool = False,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        self.to_sql_fast(
+            name=name,
+            con=con,
+            session_timezone=session_timezone,
+            if_exists=if_exists,
+            index=index,
+            *args,
+            **kwargs,
+        )
 
     def column_info(
         self, con: mariadb.Connection, table_name: str | None = None
