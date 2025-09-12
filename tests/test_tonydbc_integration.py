@@ -290,7 +290,9 @@ class TestTonyDBCIntegration:
         ids = [r["id"] for r in rows]
 
         # Build update dataframe indexed by PK
-        upd = pd.DataFrame({"name": ["U1x", "U2y"], "email": ["x@test.com", "y@test.com"]})
+        upd = pd.DataFrame(
+            {"name": ["U1x", "U2y"], "email": ["x@test.com", "y@test.com"]}
+        )
         upd.index = ids
         upd.index.name = "id"
 
