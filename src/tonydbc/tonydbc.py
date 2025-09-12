@@ -133,6 +133,7 @@ class _TonyDBCOnlineOnly:
     session_uuid: str
     session_timezone: str
     ipath: str
+    media_to_deserialize: dict[str, list[str]]
     _audit_db: "_TonyDBCOnlineOnly | None"
 
     def __init__(
@@ -142,7 +143,7 @@ class _TonyDBCOnlineOnly:
         password: str | None = None,
         database: str | None = None,
         port: int = 3306,
-        media_to_deserialize: list[str] = [],
+        media_to_deserialize: dict[str, list[str]] = {},
         autocommit: bool = True,
         logger_instance: Any | None = None,
         prefix: str = "",
@@ -402,9 +403,8 @@ class _TonyDBCOnlineOnly:
         )
 
         # e.g. '+00:00'
-        actual_time_offset = self.get_data("SELECT @@session.time_zone;")[0][
-            "@@session.time_zone"
-        ]
+        timezone_data = self.get_data("SELECT @@session.time_zone;")
+        actual_time_offset = timezone_data[0]["@@session.time_zone"]
         assert actual_time_offset == self.session_time_offset, (
             f"Actual timezone offset {actual_time_offset} does not match expected timezone offset {self.session_time_offset} of timezone {self.session_timezone}"
         )
@@ -472,7 +472,7 @@ class _TonyDBCOnlineOnly:
         if not self.using_temp_conn:
             raise AssertionError("You are not using your temporary connection.")
         # Close the temporary connection
-        self.__exit__(None, None, None)  # type: ignore[call-arg]
+        self.__exit__(exit_type=None, value=None, traceback=None)
         # Restore the original connection
         self._mariatonydbcn = self._mariatonydbcn_old
         self.using_temp_conn = False
@@ -625,9 +625,9 @@ class _TonyDBCOnlineOnly:
         }
 
         if table_name in self.media_to_deserialize:
-            columns_to_serialize: list[str] = self.media_to_deserialize[table_name]
+            columns_to_serialize = self.media_to_deserialize[table_name]
         else:
-            columns_to_serialize: list[str] = []
+            columns_to_serialize = []
 
         df_serialized = serialize_table(df, col_dtypes, columns_to_serialize)
 

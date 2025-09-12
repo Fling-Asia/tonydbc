@@ -35,7 +35,7 @@ WARN_MISSING_PATHS = False
 class CaptureLogsHandler(logging.Handler):
     def __init__(self) -> None:
         super().__init__()
-        self.messages = []
+        self.messages: list[str] = []
 
     def emit(self, record: logging.LogRecord) -> None:
         self.messages.append(record.getMessage())
@@ -139,8 +139,8 @@ def check_environment_variable_integrity(env_filepath: str) -> None:
         current_path = current_env[current_key]
 
         if WARN_MISSING_PATHS:
-            if current_path == "":
-                print(f"WARNING: {k_prefix} which is blank.")
+            if current_path is None or current_path == "":
+                print(f"WARNING: {k_prefix} which is blank or None.")
                 continue
             if not (os.path.isdir(current_path) or os.path.isfile(current_path)):
                 print(

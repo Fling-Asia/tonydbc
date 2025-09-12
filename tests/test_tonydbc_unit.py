@@ -107,7 +107,7 @@ class TestTonyDBCOnlineOnly:
             password="testpass",
             database="testdb",
             port=3307,
-            media_to_deserialize=["col1", "col2"],
+            media_to_deserialize={"test_table": ["col1", "col2"]},
             autocommit=False,
             logger_instance=Mock(),
             prefix="TEST",
@@ -122,7 +122,7 @@ class TestTonyDBCOnlineOnly:
         assert db.password == "testpass"
         assert db.database == "testdb"
         assert db.port == 3307
-        assert db.media_to_deserialize == ["col1", "col2"]
+        assert db.media_to_deserialize == {"test_table": ["col1", "col2"]}
         assert not db.autocommit
         assert db.prefix == "TEST"
         assert db.interact_after_error

@@ -89,7 +89,7 @@ class DataFrameFast(pd.DataFrame):
         index: bool = False,
         *args: Any,
         **kwargs: Any,
-    ) -> None:  # type: ignore[misc]
+    ) -> None:
         if if_exists not in ["replace", "append"]:
             raise AssertionError(
                 "not if_exists in ['replace', 'append'] is not yet impemented"
@@ -164,6 +164,7 @@ class DataFrameFast(pd.DataFrame):
         cols = [df0.index.name] * index + list(df0.columns)
         # Sanitize the column names
         cols = [f"`{c}`" for c in cols]
+        assert all(isinstance(c, str) for c in cols)
         cmd = (
             f"INSERT INTO `{name}` ({', '.join(cols)})"
             f" VALUES ({', '.join(['?'] * len(cols))})"
@@ -253,7 +254,7 @@ class DataFrameFast(pd.DataFrame):
                     return v
 
             try:
-                table_data = [
+                table_data_typed: list[tuple[Any, ...]] = [
                     tuple(
                         [
                             MARIADB_NULL if pd.isna(value) else int_converter(value)
@@ -262,6 +263,7 @@ class DataFrameFast(pd.DataFrame):
                     )
                     for sublist in table_data
                 ]
+                table_data = table_data_typed
             except ValueError as e:
                 if get_env_bool("INTERACT_AFTER_ERROR"):
                     code.interact(
