@@ -20,8 +20,10 @@ import tempfile
 import mariadb  # type: ignore
 import numpy as np
 import pandas as pd
+import pytz
 
 from .env_utils import get_env_bool
+from .tony_utils import get_tz_offset
 
 # Map SQL types to Python datatypes
 DATATYPE_MAP = {
@@ -79,7 +81,7 @@ LINE_TERMINATOR = "\n"  # Keep newline as is since the record separator is enoug
 
 
 class DataFrameFast(pd.DataFrame):
-    def to_sql(self, name, con, if_exists="append", index=False, *args, **kwargs):  # type: ignore[misc]
+    def to_sql(self, name, con, session_timezone:str, if_exists="append", index=False, *args, **kwargs):  # type: ignore[misc]
         if if_exists not in ["replace", "append"]:
             raise AssertionError(
                 "not if_exists in ['replace', 'append'] is not yet impemented"
@@ -117,15 +119,29 @@ class DataFrameFast(pd.DataFrame):
             if isinstance(dtype, pd.DatetimeTZDtype)
         }
 
+        # Convert from session_timezone (e.g. "Asia/Bangkok") to time_zone (e.g. "+07:00")
+        time_zone_offset = get_tz_offset(
+            iana_tz=session_timezone
+        )
+        import code; code.interact(local=locals(), banner="time_zone")
+
         # Convert all the pandas timestamp columns to string since suddenly we are getting
         # mariadb.NotSupportedError when trying to append
         if len(dt_cols) > 0:
             with con.cursor() as cursor:
-                cursor.execute("SELECT @@session.time_zone;")
-                time_zones = cursor.fetchone()
-                assert len(time_zones) == 1
-                time_zone = time_zones[0]
-                # e.g. "+07:00"
+                
+                # Handle special case where MariaDB returns 'SYSTEM' 
+                # Convert to UTC if we can't parse the timezone
+                if time_zone == 'SYSTEM':
+                    # Try to get the actual system timezone
+                    cursor.execute("SELECT @@system_time_zone;")
+                    system_tz = cursor.fetchone()[0]
+                    # If system timezone is also not parseable, default to UTC
+                    try:
+                        pytz.timezone(system_tz)
+                        time_zone = system_tz
+                    except:
+                        time_zone = 'UTC'
 
             for dt_col in dt_cols.keys():
                 # I think this is okay if we were careful to have the column's data

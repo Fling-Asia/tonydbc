@@ -80,10 +80,14 @@ def serialize_table(cur_df, col_dtypes, columns_to_serialize: typing.List[str]):
     int_cols = [
         col
         for col, dt in dict(col_dtypes).items()
-        if dt is int and col in cur_df.columns
+        if (dt is int or dt is np.int64) and col in cur_df.columns
     ]
-    # Columns with NaN can't be cast to int so let's first change NaN to -1
-    cur_df[int_cols] = cur_df[int_cols].fillna(-1)
+    # Columns with NaN or None can't be cast to int so let's first change them to -1
+    # Handle both NaN and None values
+    for col in int_cols:
+        if col in cur_df.columns:
+            # Replace None and NaN with -1 directly to avoid FutureWarning
+            cur_df[col] = cur_df[col].replace({None: -1, pd.NA: -1, np.nan: -1}).infer_objects(copy=False)
 
     # If we explicitly cast string columns to str instead of leaving them as object
     # then None values will be replaced with 'None' and won't insert properly into the database

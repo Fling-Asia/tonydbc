@@ -385,6 +385,10 @@ class _TonyDBCOnlineOnly:
             f"which is IANA timezone {self.session_timezone}."
         )
 
+        # e.g. '+00:00'
+        actual_time_offset = self.get_data("SELECT @@session.time_zone;")[0]['@@session.time_zone']
+        assert actual_time_offset == self.session_time_offset, f"Actual timezone offset {actual_time_offset} does not match expected timezone offset {self.session_time_offset} of timezone {self.session_timezone}"
+
         return self
 
     def __exit__(self, exit_type, value, traceback):
@@ -392,8 +396,12 @@ class _TonyDBCOnlineOnly:
         if not self.autocommit:
             self.log("TonyDBC commit pending transactions.")
             self.commit()
-        self._mariatonydbcn.close()
-        self.log("TonyDBC mariadb connection closed.")
+        # Only close if connection is still open
+        if hasattr(self, '_mariatonydbcn') and self._mariatonydbcn and not getattr(self._mariatonydbcn, '_closed', True):
+            self._mariatonydbcn.close()
+            self.log("TonyDBC mariadb connection closed.")
+        else:
+            self.log("TonyDBC mariadb connection already closed.")
 
         if self.do_audit:
             assert self._audit_db is not None, (
@@ -552,7 +560,7 @@ class _TonyDBCOnlineOnly:
         """
         df0 = DataFrameFast(df)
         df0.to_sql(
-            name=table_name, con=self._mariatonydbcn, if_exists=if_exists, index=index
+            name=table_name, con=self._mariatonydbcn, session_timezone=self.session_timezone, if_exists=if_exists, index=index
         )
 
     def update_table(self, table_name: str, df):

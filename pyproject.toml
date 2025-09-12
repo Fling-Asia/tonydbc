@@ -45,6 +45,23 @@ dev = ["black", "bumpver", "isort", "pip-tools", "pytest"]
 [project.urls]
 Homepage = "https://github.com/Fling-Asia/tonydbc"
 
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]  # Enable error, pyflakes, and warning categories, organize imports
+extend-ignore = [
+  "E203",  # whitespace before ':' (Black handles this?  But we don't use black anymore; oh well)
+  "E501",  # line too long (let formatter handle this)
+]
+
+[tool.ruff.format]
+quote-style = "double"  # Or "single"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "lf"
+
 [tool.bumpver]
 current_version = "1.2.30"
 version_pattern = "MAJOR.MINOR.PATCH"

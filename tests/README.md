@@ -37,6 +37,9 @@ python tests/run_tests.py
 
 # Or use pytest directly
 pytest tests/test_timestamp_issue.py -v -s
+
+# Or if you need code.interact
+pytest -s -v -x
 ```
 
 ## What the Tests Do
