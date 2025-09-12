@@ -36,7 +36,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 # from testcontainers.mysql import MySqlContainer as MariaDbContainer
 from testcontainers.core.container import DockerContainer
 
-
 import tonydbc
 
 
@@ -90,7 +89,8 @@ def _wait_db(host, port, user, pwd, db, timeout=120):
 @pytest.fixture(scope="session")
 def mariadb_container():
     """Create a MariaDB container for testing (no deprecated waits)."""
-    user = pwd = "test"; db = "test"
+    user = pwd = "test"
+    db = "test"
     container = (
         DockerContainer("mariadb:11.4")
         .with_env("MYSQL_ROOT_PASSWORD", "test")
@@ -532,7 +532,9 @@ def test_timestamp_workarounds(setup_tables):
         # Strategy 3: Use Python datetime objects
         print("\n3️⃣ Converting to Python datetime objects...")
         df_dt = base_df.copy()
-        df_dt["file_created_at"] = df_dt["file_created_at"].dt.to_pydatetime().values
+        df_dt["file_created_at"] = df_dt["file_created_at"].apply(
+            lambda x: x.to_pydatetime()
+        )
         df_dt["video_sequence"] = df_dt["video_sequence"] + 300
 
         try:
