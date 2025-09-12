@@ -605,44 +605,59 @@ class TestTonyDBCOnlineOnly:
         assert result == mock_data
 
     def test_production_databases_from_env(self, tonydbc_instance):
-        """Test production_databases property reads from environment"""
+        """Test production_databases property reads from environment and adds system DBs"""
         db, mock_conn, mock_cursor = tonydbc_instance
 
-        with patch("tonydbc.tonydbc.get_env_list", return_value=["prod1", "prod2"]):
+        with patch.dict("os.environ", {"PRODUCTION_DATABASES": '["prod1", "prod2"]'}):
             result = db.production_databases
 
-        assert result == ["prod1", "prod2"]
+        # Should include env databases + system databases, sorted
+        expected = sorted(["prod1", "prod2", "information_schema", "mysql", "performance_schema", "sys"])
+        assert result == expected
 
     def test_production_databases_empty_list(self, tonydbc_instance):
-        """Test production_databases returns empty list when not set"""
+        """Test production_databases returns only system DBs when env var not set"""
         db, mock_conn, mock_cursor = tonydbc_instance
 
-        with patch(
-            "tonydbc.tonydbc.get_env_list", side_effect=KeyError("PRODUCTION_DATABASES")
-        ):
+        with patch.dict("os.environ", {}, clear=True):
             result = db.production_databases
 
-        assert result == []
+        # Should only include system databases when no env var is set
+        expected = sorted(["information_schema", "mysql", "performance_schema", "sys"])
+        assert result == expected
 
     def test_drop_database_production_raises_error(self, tonydbc_instance):
         """Test drop_database raises error for production database"""
         db, mock_conn, mock_cursor = tonydbc_instance
 
-        with patch.object(db, "production_databases", ["prod_db"]):
-            with pytest.raises(AssertionError, match="production database"):
-                db.drop_database("prod_db")
+        # Set the private attribute directly to simulate production databases
+        db._TonyDBCOnlineOnly__production_databases = ["prod_db"]
+        
+        with pytest.raises(AssertionError, match="production database"):
+            db.drop_database("prod_db")
 
     def test_drop_database_success(self, tonydbc_instance):
         """Test drop_database executes DROP DATABASE command"""
         db, mock_conn, mock_cursor = tonydbc_instance
 
+        # Set the private attribute to empty list (no production databases)
+        db._TonyDBCOnlineOnly__production_databases = []
+        
+        def mock_get_data(query):
+            if query == "SHOW DATABASES;":
+                return [{"Database": "test_db"}, {"Database": "other_db"}]
+            return []
+        
         with (
-            patch.object(db, "production_databases", []),
+            patch.object(db, "get_data", side_effect=mock_get_data),
             patch.object(db, "execute") as mock_execute,
         ):
             db.drop_database("test_db")
 
-        mock_execute.assert_called_once_with("DROP DATABASE test_db;")
+        # Should call execute twice: UNLOCK TABLES and DROP DATABASE
+        assert mock_execute.call_count == 2
+        mock_execute.assert_any_call("USE test_db; UNLOCK TABLES;")
+        mock_execute.assert_any_call("DROP DATABASE test_db;")
 
     def test_post_data(self, tonydbc_instance):
         """Test post_data executes query"""
@@ -700,10 +715,10 @@ class TestTonyDBCOnlineOnly:
             tmp_file.write("CREATE TABLE test (id INT);")
             tmp_file.flush()
 
-            with patch.object(db, "execute") as mock_execute:
-                db.execute_script(tmp_file.name)
+            db.execute_script(tmp_file.name)
 
-            mock_execute.assert_called()
+            # Should call cursor.execute with the SQL command
+            mock_cursor.execute.assert_called_once_with("CREATE TABLE test (id INT);")
 
         os.unlink(tmp_file.name)
 
@@ -711,16 +726,21 @@ class TestTonyDBCOnlineOnly:
         """Test execute_script with return values enabled"""
         db, mock_conn, mock_cursor = tonydbc_instance
 
+        # Mock cursor to return data
+        mock_cursor.fetchall.return_value = [(1,)]
+        mock_cursor.description = [("result", None, None, None, None, None, None, None, None, None, None)]
+
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".sql", delete=False
         ) as tmp_file:
             tmp_file.write("SELECT 1 as result;")
             tmp_file.flush()
 
-            with patch.object(db, "get_data", return_value=[{"result": 1}]):
-                result = db.execute_script(tmp_file.name, get_return_values=True)
+            result = db.execute_script(tmp_file.name, get_return_values=True)
 
-            assert result == [{"result": 1}]
+            # Should return list with one dict containing the result
+            assert len(result) == 1
+            assert result[0] == [{"result": 1}]
 
         os.unlink(tmp_file.name)
 
