@@ -119,44 +119,24 @@ class DataFrameFast(pd.DataFrame):
             if isinstance(dtype, pd.DatetimeTZDtype)
         }
 
-        # Convert from session_timezone (e.g. "Asia/Bangkok") to time_zone (e.g. "+07:00")
-        time_zone_offset = get_tz_offset(
-            iana_tz=session_timezone
-        )
-        import code; code.interact(local=locals(), banner="time_zone")
-
         # Convert all the pandas timestamp columns to string since suddenly we are getting
         # mariadb.NotSupportedError when trying to append
         if len(dt_cols) > 0:
-            with con.cursor() as cursor:
-                
-                # Handle special case where MariaDB returns 'SYSTEM' 
-                # Convert to UTC if we can't parse the timezone
-                if time_zone == 'SYSTEM':
-                    # Try to get the actual system timezone
-                    cursor.execute("SELECT @@system_time_zone;")
-                    system_tz = cursor.fetchone()[0]
-                    # If system timezone is also not parseable, default to UTC
-                    try:
-                        pytz.timezone(system_tz)
-                        time_zone = system_tz
-                    except:
-                        time_zone = 'UTC'
-
             for dt_col in dt_cols.keys():
                 # I think this is okay if we were careful to have the column's data
                 # in the current session's datetime format
                 new_col = (
                     df0.loc[:, dt_col]
                     # Convert to the correct time zone if necessary
-                    .dt.tz_convert(time_zone)
+                    .dt.tz_convert(session_timezone)
                     # Convert to a string for mariadb to digest
-                    .dt.strftime("%Y-%m-%d %H:%M:%S.%f")
+                    .dt.strftime("%Y-%m-%d %H:%M:%S.%f").astype("string")
                 )
 
                 # Directly assign the converted datetime strings without intermediate assignments
                 # This avoids the pandas FutureWarning about incompatible dtype assignment
-                df0.loc[:, dt_col] = new_col.astype(str)
+                # And by creating a fresh Series here, this will work even if df0 is empty
+                df0[dt_col] = pd.Series(new_col, dtype="string", index=df0.index)
 
         # Convert np.int64 columns to np.int32 since MySQL cannot accept np.int64 as a param
         small_int64cols = {
