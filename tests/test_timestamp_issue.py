@@ -10,9 +10,9 @@ import os
 import sys
 from pathlib import Path
 
+import mariadb  # type: ignore
 import pandas as pd
 import pytest
-import mariadb  # type: ignore
 from mariadb.constants.CLIENT import MULTI_STATEMENTS  # type: ignore
 
 # Set required environment variables BEFORE importing tonydbc
@@ -122,7 +122,7 @@ def tonydbc_instance(mariadb_container):
         )
         print("✅ Raw MariaDB connection successful!")
         test_conn.close()
-        
+
         # SECOND: Create TonyDBC instance with container connection details
         print("Creating TonyDBC instance...")
         db_instance = tonydbc.TonyDBC(
@@ -246,14 +246,14 @@ def setup_tables(mariadb_container, tonydbc_instance):
 
         # Insert test data for foreign keys
         db.execute("""
-            INSERT INTO sortie (name, description) VALUES 
+            INSERT INTO sortie (name, description) VALUES
             ('Test Sortie 1', 'First test sortie for video testing'),
             ('Test Sortie 2', 'Second test sortie for video testing'),
             ('Test Sortie 3', 'Third test sortie for timestamp testing')
         """)
 
         db.execute("""
-            INSERT INTO machine (name, hostname) VALUES 
+            INSERT INTO machine (name, hostname) VALUES
             ('Test Machine 1', 'testmachine1.local'),
             ('Test Machine 2', 'testmachine2.local'),
             ('Recording Station Alpha', 'recorder-alpha.local')
@@ -370,57 +370,55 @@ def test_dataframe_creation():
     print(f"   - Sample timestamp: {df['file_created_at'].iloc[0]}")
 
 
-def test_timestamp_issue_reproduction(setup_tables):
-    """Test that reproduces the original timestamp error"""
+def test_timestamp_data_insertion(setup_tables):
+    """Test pandas timestamp data insertion and data quality"""
 
     with setup_tables as db:
         # Create test data with pandas timestamps
         videos_df = create_test_video_dataframe(num_rows=2, base_sequence=1)
 
         print("\n" + "=" * 60)
-        print("🔍 REPRODUCING: Original timestamp error")
+        print("🔍 TESTING: Timestamp data insertion and quality")
         print("=" * 60)
         print("DataFrame dtypes:")
         for col in ["file_created_at", "created_at", "updated_at"]:
             if col in videos_df.columns:
                 print(f"  {col}: {videos_df[col].dtype}")
 
-        # This should reproduce the error:
-        # "Data type 'Timestamp' in column X not supported in MariaDB Connector/Python"
-        try:
-            result_df = db.append_to_table("video", videos_df, return_reindexed=True)
+        # Test data insertion with pandas timestamps
+        result_df = db.append_to_table("video", videos_df, return_reindexed=True)
 
-            print("❌ UNEXPECTED: Data inserted successfully!")
-            print("   This means the timestamp issue might already be fixed.")
+        print("✅ SUCCESS: Data inserted successfully!")
+        print(f"   Inserted {len(result_df)} rows with IDs: {result_df.index.tolist()}")
+
+        # Verify the data was inserted correctly and check data quality
+        videos = db.get_data(
+            f"SELECT * FROM video WHERE id IN ({','.join(map(str, result_df.index))})"
+        )
+
+        print("\n📊 DATA QUALITY CHECKS:")
+        for video in videos:
+            print(f"   Video {video['id']}:")
             print(
-                f"   Inserted {len(result_df)} rows with IDs: {result_df.index.tolist()}"
+                f"     file_created_at: {video['file_created_at']} (type: {type(video['file_created_at'])})"
+            )
+            print(
+                f"     event_log_id: {video['event_log_id']} (should be NULL for test data)"
             )
 
-            # Verify the data was actually inserted correctly
-            inserted_videos = db.get_data("SELECT * FROM video ORDER BY id")
-            assert len(inserted_videos) == 2, (
-                f"Expected 2 videos, got {len(inserted_videos)}"
+        # Assertions for data quality
+        assert len(videos) == len(videos_df), (
+            f"Expected {len(videos_df)} rows, got {len(videos)}"
+        )
+
+        # Check that timestamps were preserved correctly
+        for video in videos:
+            assert video["file_created_at"] is not None, "Timestamp should not be NULL"
+            assert video["event_log_id"] is None, (
+                "event_log_id should be NULL for test data"
             )
 
-            # Check timestamp values
-            for video in inserted_videos:
-                assert video["file_created_at"] is not None, (
-                    "file_created_at should not be NULL"
-                )
-                print(
-                    f"   Video {video['id']}: file_created_at = {video['file_created_at']}"
-                )
-
-        except Exception as e:
-            print(f"✅ REPRODUCED: {type(e).__name__}: {e}")
-            print("   This is the expected error we need to fix!")
-
-            # Let's examine what went wrong
-            print("\n🔍 Error analysis:")
-            print(f"   Exception type: {type(e)}")
-            print(f"   Exception args: {e.args}")
-
-            raise  # Re-raise for pytest to catch
+        print("✅ All data quality checks passed!")
 
 
 def test_timestamp_workarounds(setup_tables):
