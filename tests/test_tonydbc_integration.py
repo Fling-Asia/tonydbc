@@ -363,3 +363,114 @@ class TestTonyDBCIntegration:
         # This should raise an error since table no longer exists
         with pytest.raises(Exception):
             db.get_data(f"SELECT * FROM {temp_table_name}")
+
+    def test_sortie_append_with_timestamps(self, tonydbc_instance):
+        """Create `sortie` table and append a tz-aware dataframe without errors."""
+        with tonydbc_instance as db:
+            # Create referenced tables for foreign keys
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS `flightplan` (
+                  `id` BIGINT(20) NOT NULL,
+                  PRIMARY KEY (`id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                """
+            )
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS `subsoi` (
+                  `id` BIGINT(20) NOT NULL,
+                  PRIMARY KEY (`id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                """
+            )
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS `stock_check` (
+                  `id` BIGINT(20) NOT NULL,
+                  PRIMARY KEY (`id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                """
+            )
+
+            # Seed a flightplan id referenced by the sortie row
+            db.execute("REPLACE INTO `flightplan` (`id`) VALUES (52451);")
+
+            # Create the `sortie` table (matching the provided schema, with safe index names)
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS `sortie` (
+                  `id`                      BIGINT(20) NOT NULL AUTO_INCREMENT,
+                  `flight_id`               BIGINT(20) DEFAULT NULL,
+                  `subsoi_id`               BIGINT(20) DEFAULT NULL,
+                  `stock_check_id`          BIGINT(20) DEFAULT NULL,
+                  `attempt_sequence`        INT    NOT NULL,
+                  `from_event_id`           BIGINT(20) DEFAULT NULL,
+                  `to_event_id`             BIGINT(20) DEFAULT NULL,
+                  `from_timestamp`          BIGINT(20) DEFAULT NULL,
+                  `to_timestamp`            BIGINT(20) DEFAULT NULL,
+                  `fps`                     FLOAT  DEFAULT NULL,
+                  `video_width`             INT    DEFAULT NULL,
+                  `video_height`            INT    DEFAULT NULL,
+                  `multi_video_length`      DOUBLE DEFAULT NULL,
+                  `flight_event_log_id`     BIGINT DEFAULT NULL,
+                  `flightplan_lookup_works`  BOOL DEFAULT NULL,
+                  `is_corrupted`            BOOL DEFAULT NULL,
+                  `created_at`              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  `updated_at`              TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                  PRIMARY KEY (`id`),
+                  UNIQUE KEY `uk_sortie_flight_attempt` (`flight_id`, `attempt_sequence`),
+                  CONSTRAINT `fk_sortie_flight` FOREIGN KEY (`flight_id`) REFERENCES `flightplan` (`id`),
+                  CONSTRAINT `fk_sortie_subsoi` FOREIGN KEY (`subsoi_id`) REFERENCES `subsoi` (`id`),
+                  CONSTRAINT `fk_sortie_stock_check` FOREIGN KEY (`stock_check_id`) REFERENCES `stock_check` (`id`),
+                  CONSTRAINT `sortie_constraint_flight_subsoi`
+                    CHECK ((`flight_id` IS NULL     AND `subsoi_id` IS NOT NULL AND `stock_check_id` IS NOT NULL)
+                       OR  (`flight_id` IS NOT NULL AND `subsoi_id` IS NULL     AND `stock_check_id` IS NULL))
+                ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4;
+                """
+            )
+
+            # Add helpful indexes (avoid duplicating FK names)
+            db.execute(
+                """
+                ALTER TABLE `sortie` ADD INDEX `idx_sortie_flight` (`flight_id`);
+                """
+            )
+            db.execute(
+                """
+                ALTER TABLE `sortie` ADD INDEX `idx_sortie_subsoi` (`subsoi_id`);
+                """
+            )
+            db.execute(
+                """
+                ALTER TABLE `sortie` ADD INDEX `idx_sortie_stock_check` (`stock_check_id`);
+                """
+            )
+
+            # Build the timezone-aware dataframe as specified
+            tz = "Asia/Bangkok"
+            sortie_df = pd.DataFrame(
+                {
+                    "flight_id": [52451],
+                    "attempt_sequence": [2],
+                    "from_timestamp": [pd.Timestamp("2025-01-16 08:49:26", tz=tz)],
+                    "to_timestamp": [pd.Timestamp("2025-01-16 08:58:55", tz=tz)],
+                    "fps": [0.0],
+                    "video_width": [0],
+                    "video_height": [0],
+                    "multi_video_length": [569.0],
+                    "flight_event_log_id": [10859171],
+                    "flightplan_lookup_works": [True],
+                    "is_corrupted": [False],
+                }
+            )
+
+            # This should not raise due to timestamp handling
+            res = db.append_to_table("sortie", sortie_df, return_reindexed=True)
+            assert res is not None and len(res) == 1
+
+            # Cleanup created tables
+            db.execute("DROP TABLE IF EXISTS `sortie`;")
+            db.execute("DROP TABLE IF EXISTS `flightplan`;")
+            db.execute("DROP TABLE IF EXISTS `subsoi`;")
+            db.execute("DROP TABLE IF EXISTS `stock_check`;")
