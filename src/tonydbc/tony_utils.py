@@ -70,9 +70,9 @@ def serialize_table(
             # Use Series.apply on the single column to satisfy mypy's overloads
             col_series = cur_df.loc[:, c]
             cur_df.loc[:, c] = col_series.apply(
-                lambda x: None
-                if np.any(pd.isna(x))
-                else json.dumps(x, cls=NumpyEncoder)
+                lambda x: (
+                    None if np.any(pd.isna(x)) else json.dumps(x, cls=NumpyEncoder)
+                )
             )
         except TypeError as e:
             raise TypeError(f"Column {c} could not be serialized; {e}")
@@ -201,20 +201,29 @@ def get_current_time_string(
 
 
 def set_MYSQL_DATABASE(
-    use_production_database: bool = get_env_bool("USE_PRODUCTION_DATABASE"),
-    mysql_production_database: str = os.environ["MYSQL_PRODUCTION_DATABASE"],
-    mysql_test_database: str = os.environ["MYSQL_TEST_DATABASE"],
+    use_production_database: bool | None = None,
+    mysql_production_database: str | None = None,
+    mysql_test_database: str | None = None,
 ) -> None:
     """Set the MYSQL_DATABASE environment variable"""
     # If it's already been set, don't take any action
     # (this applies to our docker containers, which have it pre-set)
     # if "MYSQL_DATABASE" in os.environ:
     #    return
+    if use_production_database is None:
+        use_production_database = get_env_bool("USE_PRODUCTION_DATABASE")
+        assert use_production_database is not None
 
     # Otherwise, set it according to whether we should be in production or not
     if use_production_database:
+        if mysql_production_database is None:
+            mysql_production_database = os.environ["MYSQL_PRODUCTION_DATABASE"]
+        assert mysql_production_database is not None
         os.environ["MYSQL_DATABASE"] = mysql_production_database
     else:
+        if mysql_test_database is None:
+            mysql_test_database = os.environ["MYSQL_TEST_DATABASE"]
+        assert mysql_test_database is not None
         os.environ["MYSQL_DATABASE"] = mysql_test_database
 
 
