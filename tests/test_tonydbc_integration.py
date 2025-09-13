@@ -447,27 +447,55 @@ class TestTonyDBCIntegration:
                 """
             )
 
-            # Build the timezone-aware dataframe as specified
-            tz = "Asia/Bangkok"
-            sortie_df = pd.DataFrame(
-                {
-                    "flight_id": [52451],
-                    "attempt_sequence": [2],
-                    "from_timestamp": [pd.Timestamp("2025-01-16 08:49:26", tz=tz)],
-                    "to_timestamp": [pd.Timestamp("2025-01-16 08:58:55", tz=tz)],
-                    "fps": [0.0],
-                    "video_width": [0],
-                    "video_height": [0],
-                    "multi_video_length": [569.0],
-                    "flight_event_log_id": [10859171],
-                    "flightplan_lookup_works": [True],
-                    "is_corrupted": [False],
-                }
-            )
+            for attempt_sequence, tz in enumerate(["Asia/Bangkok", "UTC", "America/New_York"]):
+                # Build the timezone-aware dataframe as specified
+                sortie_df = pd.DataFrame(
+                    {
+                        "flight_id": [52451],
+                        "attempt_sequence": [attempt_sequence],
+                        "from_timestamp": [pd.Timestamp("2025-01-16 08:49:26", tz=tz)],
+                        "to_timestamp": [pd.Timestamp("2025-01-16 08:58:55", tz=tz)],
+                        "fps": [0.0],
+                        "video_width": [0],
+                        "video_height": [0],
+                        "multi_video_length": [569.0],
+                        "flight_event_log_id": [10859171],
+                        "flightplan_lookup_works": [True],
+                        "is_corrupted": [False],
+                    }
+                )
 
-            # This should not raise due to timestamp handling
-            res = db.append_to_table("sortie", sortie_df, return_reindexed=True)
-            assert res is not None and len(res) == 1
+                # CHECK THAT THIS RAISES AN ERROR BECAUSE Timestamp != BIGINT for from_timestamp and to_timestamp
+                # This should not raise due to timestamp handling
+                with pytest.raises(TypeError):
+                    db.append_to_table("sortie", sortie_df, return_reindexed=True)
+                with pytest.raises(TypeError):
+                    db.append_to_table("sortie", sortie_df, return_reindexed=False)
+
+                sortie_df_converted = sortie_df.copy()
+
+                # Special case: two columns, `from_timestamp` and `to_timestamp`, are actually BIGINT
+                # so must be converted here before we append_to_table
+                for k in ["from_timestamp", "to_timestamp"]:
+                    s = sortie_df_converted[k]
+                    assert isinstance(s.dtype, pd.DatetimeTZDtype)
+                    s = s.dt.tz_convert("UTC").dt.tz_localize(None)
+                    sortie_df_converted[k] = s.astype("int64").astype("Int64")
+
+                # This should not raise due to timestamp handling
+                res = db.append_to_table(
+                    "sortie", sortie_df_converted, return_reindexed=True
+                )
+                assert res is not None and len(res) == 1
+
+                # Check that the timestamp agree with the database
+                for k in ["from_timestamp", "to_timestamp"]:
+                    assert (
+                        pd.to_datetime(
+                            int(res.iloc[0][k]), unit="ns", utc=True
+                        ).tz_convert(tz)
+                        == sortie_df.iloc[0][k]
+                    )
 
             # Cleanup created tables
             db.execute("DROP TABLE IF EXISTS `sortie`;")
