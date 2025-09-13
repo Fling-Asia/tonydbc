@@ -23,6 +23,8 @@ To publish a new version of tonydbc to PyPI:
 4. Run these commands:
 
 ```bash
+# Set the dependencies and verify the toml
+poetry lock
 # Static checking and formatting
 mypy .
 ruff check . --fix
