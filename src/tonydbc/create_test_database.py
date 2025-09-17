@@ -5,7 +5,7 @@
 import os
 import pathlib
 
-import pyperclip
+import clipman
 
 from .tony_utils import prepare_scripts
 from .tonydbc import TonyDBC
@@ -116,7 +116,6 @@ def create_test_database(
         # but just re-running the refresh seems to work since we only get the error
         # about 20% of the time.  It happens on wsc_status_log, the biggest table,
         # with 580k+ rows.
-        pass
 
     program_to_run += "\n".join(custom_commands)
 
@@ -124,7 +123,8 @@ def create_test_database(
 
     program_to_run += "\nSET FOREIGN_KEY_CHECKS = 1;"
 
-    pyperclip.copy(program_to_run)
+    clipman.init()
+    clipman.set(program_to_run)
 
     print(
         """

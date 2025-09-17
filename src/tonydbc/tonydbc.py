@@ -561,7 +561,7 @@ class _TonyDBCOnlineOnly:
         # Make new connections
         self.__enter__()
 
-    def iso_timestamp_to_session_time_zone(self, iso_timestamp_string: str):
+    def iso_timestamp_to_session_time_zone(self, iso_timestamp_string: str) -> str:
         """e.g. converts an ISO-formatted string to the database session's time zone,
         self.default_tz, which is useful when adding to a mariadb TIMESTAMP
         which assumes the time is formatted as the session time zone.
@@ -584,7 +584,9 @@ class _TonyDBCOnlineOnly:
             iso_ts = ts.astimezone(self.default_tz)  # dateutil.tz.UTC
             return iso_ts.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
 
-    def write_dataframe(self, df, table_name, if_exists="replace", index=False):
+    def write_dataframe(
+        self, df: pd.DataFrame, table_name: str, if_exists: str = "replace", index=False
+    ) -> None:
         """Write all rows of a dataframe to the database
         Assumes the fields are the same in number and data type
         """
@@ -597,7 +599,7 @@ class _TonyDBCOnlineOnly:
             index=index,
         )
 
-    def update_table(self, table_name: str, df):
+    def update_table(self, table_name: str, df: pd.DataFrame):
         """Perform an UPDATE with appropriate serialization.
 
         This is the spiritual sister of `append_to_table` (i.e. it uses the same fancy semantics
@@ -654,7 +656,14 @@ class _TonyDBCOnlineOnly:
         with self.cursor() as cursor:
             cursor.executemany(update_command, update_command_values)
 
-    def update_blob(self, table_name, blob_column, id_value, filepath, max_size_MB=16):
+    def update_blob(
+        self,
+        table_name: str,
+        blob_column: str,
+        id_value,
+        filepath: str,
+        max_size_MB: int = 16,
+    ):
         """Add a BLOB (Binary Large OBject) to the database, from a file
         This requires that the table row already exists; we are just updating it
 
@@ -847,11 +856,11 @@ class _TonyDBCOnlineOnly:
             return records
 
     @property
-    def databases(self):
+    def databases(self) -> list[str]:
         return [d["Database"] for d in self.get_data("SHOW DATABASES;")]
 
     @property
-    def users(self):
+    def users(self) -> list[tuple[str, str]]:
         return [
             (d["Host"], d["User"])
             for d in self.get_data("SELECT * FROM mysql.user", no_tracking=True)
@@ -863,7 +872,7 @@ class _TonyDBCOnlineOnly:
         )
 
     @property
-    def production_databases(self):
+    def production_databases(self) -> list[str]:
         try:
             return self.__production_databases
         except AttributeError:
@@ -885,7 +894,7 @@ class _TonyDBCOnlineOnly:
 
             return self.__production_databases
 
-    def drop_database(self, database):
+    def drop_database(self, database: str) -> None:
         if database in self.production_databases:
             raise AssertionError(
                 f"DANGER DANGER!  You are trying to drop {database}, "
@@ -1180,14 +1189,14 @@ class _TonyDBCOnlineOnly:
             }
             return self._column_datatypes
 
-    def non_primary_keys(self, table):
+    def non_primary_keys(self, table: str):
         """Returns a list of all non-primary keys for a table"""
         pk = self.get_primary_key(table=table)
         cols = self.get_column_datatypes(table=table).keys()
         return [c for c in cols if c != pk]
 
     @property
-    def connection_params(self):
+    def connection_params(self) -> dict[str, Any]:
         """Useful for making a new connection.  A dict of all you need.
 
         e.g.
@@ -1204,7 +1213,7 @@ class _TonyDBCOnlineOnly:
             "media_to_deserialize": self.media_to_deserialize,
         }
 
-    def insert_row_all_string(self, table, row_dict):
+    def insert_row_all_string(self, table: str, row_dict: dict[str, str]) -> None:
         """Insert a single row into a table, as all string
         Note that the row_dict is required to be all string or stringifyable
         Note that it does not autocommit
@@ -1212,7 +1221,7 @@ class _TonyDBCOnlineOnly:
         if len(row_dict) == 0:
             return
 
-        stringified_row_dict = {
+        stringified_row_dict: dict[str, str] = {
             k: str(v)
             for k, v in row_dict.items()
             # Skip any columns which are to be NULL and rely on DEFAULT VALUE because it won't accept
@@ -1221,16 +1230,16 @@ class _TonyDBCOnlineOnly:
         }
         # We must sanitize the values to avoid things like single quotes breaking the INSERT
         # so we will pass a list of values to self.execute instead
-        command = f"""
+        command: str = f"""
             INSERT INTO {table}
                        ({", ".join(stringified_row_dict.keys())})
                 VALUES ({", ".join(["%s" for _ in stringified_row_dict])})
             """
-        command_values = list(map(str, stringified_row_dict.values()))
+        command_values: list[str, Any] = list(map(str, stringified_row_dict.values()))
         self.execute(command=command, command_values=command_values)
 
     @contextmanager
-    def temp_id_table(self, id_list):
+    def temp_id_table(self, id_list: list[int]):
         """Create a temporary table filled with ids for JOINing purposes"""
         # Generate a random temporary table name
         temp_table_name = f"temp_loc_ids_{random.randint(1000, 9999)}"
@@ -1686,8 +1695,8 @@ class TonyDBC(_TonyDBCOnlineOnly):
         self,
         query: str,
         before_retry_cmd=None,
-        no_tracking=False,
-        return_type_codes=False,
+        no_tracking: bool = False,
+        return_type_codes: bool = False,
     ) -> Any:
         if not self.is_online:
             raise AssertionError("get_data can only be used while online")
@@ -1699,7 +1708,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
                 return_type_codes=return_type_codes,
             )
 
-    def drop_database(self, database) -> None:
+    def drop_database(self, database: str) -> None:
         if not self.is_online:
             raise AssertionError("Cannot drop database if not online")
         else:
@@ -1776,8 +1785,8 @@ class TonyDBC(_TonyDBCOnlineOnly):
         command: str,
         command_values=None,
         before_retry_cmd=None,
-        no_tracking=False,
-        log_progress=False,
+        no_tracking: bool = False,
+        log_progress: bool = False,
     ) -> None:
         kwargs = {
             "command": command,
@@ -1804,7 +1813,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
         else:
             self.__update_queue.put(("execute_script", kwargs))
 
-    def insert_row_all_string(self, table, row_dict) -> None:
+    def insert_row_all_string(self, table: str, row_dict: dict[str, str]) -> None:
         kwargs = {
             "table": table,
             "row_dict": row_dict,
@@ -1816,7 +1825,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
             self.__update_queue.put(("insert_row_all_string", kwargs))
 
     def append_to_table(
-        self, table, df, return_reindexed=False, no_tracking=False
+        self, table: str, df: pd.DataFrame, return_reindexed=False, no_tracking=False
     ) -> pd.DataFrame | None:
         kwargs = {
             "table": table,

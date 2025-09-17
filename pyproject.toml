@@ -19,28 +19,41 @@ classifiers = [
 ]
 keywords = ["mariadb", "database", "connector", "ODBC", "pandas"]
 dependencies = [
-    "iteration_utilities",
-    "types-python-dateutil",
-    "python-dotenv",
-    "more-itertools",
-    "jsonschema",
-    "requests",
-    "numpy>=1.23.5",
-    "pandas",
-    "paho-mqtt",
-    "mariadb",
-    "pyperclip",
-    "types-pyperclip",
-    "tzlocal",
-    "paho-mqtt>=1.6.1",
-    "filelock",
-    "uuid6",
-    "types-docker"
+  "iteration_utilities",
+  "python-dotenv",
+  "more-itertools",
+  "jsonschema",
+  "requests",
+  "numpy>=1.23.5",
+  "pandas",
+  "paho-mqtt>=1.6.1",
+  "mariadb",
+  "clipman",
+  "tzlocal",
+  "filelock",
+  "uuid6"
 ]
 requires-python = ">=3.10,<4.0"
 
 [project.optional-dependencies]
-dev = ["black", "bumpver", "isort", "pip-tools", "pytest"]
+dev = [
+  "bumpver",
+  "isort",
+  "pip-tools",
+  "pytest",
+  "mypy>=1.10",
+  "types-pytz",
+  "ruff",
+  "pandas-stubs",
+  "types-pytz",
+  "types-python-dateutil",
+  "types-docker"
+]
+test = [
+  "pytest>=7.0.0",
+  "testcontainers>=4.0.0",
+  "mariadb>=1.1.0",
+]
 
 [tool.setuptools.package-data]
 tonydbc = ["py.typed"]
@@ -54,10 +67,6 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]  # Enable error, pyflakes, and warning categories, organize imports
-extend-ignore = [
-  "E203",  # whitespace before ':' (Black handles this?  But we don't use black anymore; oh well)
-  "E501",  # line too long (let formatter handle this)
-]
 
 [tool.ruff.format]
 quote-style = "double"  # Or "single"
@@ -69,6 +78,11 @@ line-ending = "lf"
 python_version = "3.11"
 show_error_codes = true
 exclude = ["dist/"]
+mypy_path = ["src"]
+namespace_packages = true
+explicit_package_bases = true
+install_types = true
+non_interactive = true
 
 [[tool.mypy.overrides]]
 module = ["tests.*"]

@@ -447,7 +447,9 @@ class TestTonyDBCIntegration:
                 """
             )
 
-            for attempt_sequence, tz in enumerate(["Asia/Bangkok", "UTC", "America/New_York"]):
+            for attempt_sequence, tz in enumerate(
+                ["Asia/Bangkok", "UTC", "America/New_York"]
+            ):
                 # Build the timezone-aware dataframe as specified
                 sortie_df = pd.DataFrame(
                     {

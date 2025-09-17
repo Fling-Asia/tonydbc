@@ -23,14 +23,21 @@ To publish a new version of tonydbc to PyPI:
 4. Run these commands:
 
 ```bash
-# Set the dependencies and verify the toml
-poetry lock
+# Make an environment
+conda deactivate
+conda env remove -n tony1
+conda create -n tony1 python=3.11 -y
+conda activate tony1
+# Make an installation, including the test optional dependencies
+pip install -e .[dev,test]
+
 # Static checking and formatting
 mypy .
 ruff check . --fix
 ruff format .
 # Check that all tests have passed
 pytest -s -v -x
+
 # python -m pip install build twine bumpver
 bumpver update --patch
 python -m build
