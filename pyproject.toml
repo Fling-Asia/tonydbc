@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tonydbc"
-version = "1.3.4"
+version = "1.3.5"
 description = "A high-level database connector for MariaDB"
 readme = "README.md"
 authors = [{ name = "Michael Currie", email = "mcurrie@gmail.com" }]
@@ -98,7 +98,7 @@ module = ["testcontainers.*"]
 ignore_missing_imports = true
 
 [tool.bumpver]
-current_version = "1.3.4"
+current_version = "1.3.5"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "bump version {old_version} -> {new_version}"
 tag_message = "{new_version}"

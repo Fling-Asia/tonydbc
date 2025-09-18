@@ -27,7 +27,7 @@ e.g.
 
 """
 
-__version__ = "1.3.4"
+__version__ = "1.3.5"
 
 # Public API - explicitly declare what should be available when importing this package
 __all__ = [
