@@ -24,40 +24,40 @@ import pandas as pd
 
 from .env_utils import get_env_bool
 
-# Map SQL types to Python datatypes
+# Map SQL types to pandas nullable datatypes
 DATATYPE_MAP = {
-    "double": np.float64,
-    "float": float,
-    "int": int,
-    "longlong": int,
-    "smallint": int,
-    "datetime": str,
-    "var_string": str,
-    "varchar": str,
-    "char": str,
-    "blob": object,  # Not sure about this one..
-    "mediumblob": object,  # Not sure about this one..
-    "longblob": object,  # Not sure about this one..
-    "bigint": np.int64,
-    "shorttext": str,
-    "mediumtext": str,
-    "longtext": str,
-    "enum": str,
-    "tinyint": int,
-    "text": str,
-    "bool": bool,
-    "decimal": float,
-    "timestamp": str,
-    "bit": bool,
-    "mediumint": int,
-    "integer": int,
-    "int8": np.int64,
-    "int4": int,
-    "int3": int,
-    "int2": int,
-    "int1": int,
-    "middleint": int,
-    "serial": int,
+    "double": "Float64",
+    "float": "Float64",
+    "int": "Int64",
+    "longlong": "Int64",
+    "smallint": "Int64",
+    "datetime": "string",
+    "var_string": "string",
+    "varchar": "string",
+    "char": "string",
+    "blob": "object",  # Keep as object for binary data
+    "mediumblob": "object",  # Keep as object for binary data
+    "longblob": "object",  # Keep as object for binary data
+    "bigint": "Int64",
+    "shorttext": "string",
+    "mediumtext": "string",
+    "longtext": "string",
+    "enum": "string",
+    "tinyint": "Int64",
+    "text": "string",
+    "bool": "boolean",
+    "decimal": "Float64",
+    "timestamp": "string",
+    "bit": "boolean",
+    "mediumint": "Int64",
+    "integer": "Int64",
+    "int8": "Int64",
+    "int4": "Int64",
+    "int3": "Int64",
+    "int2": "Int64",
+    "int1": "Int64",
+    "middleint": "Int64",
+    "serial": "Int64",
 }
 
 # TODO: HANDLE ALL THESE:
