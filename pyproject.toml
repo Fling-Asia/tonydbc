@@ -67,6 +67,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]  # Enable error, pyflakes, and warning categories, organize imports
+ignore = ["E501"]  # Ignore line too long errors
 
 [tool.ruff.format]
 quote-style = "double"  # Or "single"

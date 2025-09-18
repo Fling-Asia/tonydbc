@@ -366,9 +366,8 @@ def read_sql_table(
     assert query is not None
 
     # Use the main tonydbc to retrieve this with
-    records, type_codes = con.get_data(
-        query=query, no_tracking=True, return_type_codes=True
-    )
+    records = con.get_data(query=query, no_tracking=True)
+    type_codes = con.get_type_codes(query=query)
 
     # TODO: convert all cols
 

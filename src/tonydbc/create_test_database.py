@@ -5,7 +5,7 @@
 import os
 import pathlib
 
-import clipman
+import clipman  # type: ignore
 
 from .tony_utils import prepare_scripts
 from .tonydbc import TonyDBC

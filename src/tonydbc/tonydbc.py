@@ -53,7 +53,7 @@ import time
 import zoneinfo
 from contextlib import contextmanager
 from types import TracebackType
-from typing import Any, Callable, Literal, overload
+from typing import Any, Callable
 
 import dateutil
 import filelock
@@ -136,6 +136,7 @@ class _TonyDBCOnlineOnly:
     ipath: str
     media_to_deserialize: dict[str, list[str]]
     _audit_db: "_TonyDBCOnlineOnly | None"
+    __production_databases: list[str]
 
     def __init__(
         self,
@@ -734,34 +735,9 @@ class _TonyDBCOnlineOnly:
 
         return df
 
-    @overload
-    def get_data(
-        self,
-        query: str,
-        before_retry_cmd: str | None = ...,
-        no_tracking: bool = ...,
-        return_type_codes: Literal[False] = ...,
-    ) -> list[dict[str, Any]]: ...
-
-    @overload
-    def get_data(
-        self,
-        query: str,
-        before_retry_cmd: str | None = ...,
-        no_tracking: bool = ...,
-        return_type_codes: Literal[True] = ...,
-    ) -> tuple[list[dict[str, Any]], dict[Any, str]]: ...
-
-    def get_data(
-        self,
-        query: str,
-        before_retry_cmd: str | None = None,
-        no_tracking: bool = False,
-        return_type_codes: bool = False,
-    ) -> Any:
-        if self.do_audit and not no_tracking:
-            started_at = self.now()
-
+    def _get_data_raw(
+        self, query: str, before_retry_cmd: str | None = None
+    ) -> tuple[list[dict[str, Any]], dict[Any, str]]:
         attempts_remaining = MAX_RECONNECTION_ATTEMPTS
         while attempts_remaining > 0:
             with self.cursor() as cursor:
@@ -831,6 +807,46 @@ class _TonyDBCOnlineOnly:
                 for warning in warnings:
                     self.log(warning)
 
+        return records0, fields
+
+    def get_type_codes(self, query: str) -> dict[str, str]:
+        """
+        Get a list of dicts with proper field names
+        (i.e. records in the pandas sense)
+        (e.g. {'media_object_id': 'LONGLONG', 'full_path': 'VAR_STRING'}
+        """
+        _, fields = self._get_data_raw(query=query)
+        type_codes = {v[0]: FIELD_TYPE_DICT[v[1]] for v in fields}
+        return type_codes
+
+    def get_data(
+        self, query: str, before_retry_cmd: str | None = None, no_tracking: bool = False
+    ) -> Any:
+        """
+        Get a list of dicts with proper field names, from a given database query.
+
+        Parameters:
+            query: the SQL query to execute (e.g. "SELECT id, pet FROM pets;")
+            before_retry_cmd: a command to execute before retrying the query
+            no_tracking: whether to track the query for audit purposes
+        Returns:
+            A list of dicts with the column names
+            [
+                {
+                    'id': 3,
+                    'pet': 'cat',
+                },
+            ]
+        """
+        if self.do_audit and not no_tracking:
+            started_at = self.now()
+
+        records0, fields = self._get_data_raw(
+            query=query, before_retry_cmd=before_retry_cmd
+        )
+
+        # Narrow our records to just the fields that are defined in cursor.description
+        # Frankly, this is a bit of a cargo-cult move; I don't remember why we do this
         records = [
             {fields[i][0]: field_value for i, field_value in enumerate(v)}
             for v in records0
@@ -845,15 +861,7 @@ class _TonyDBCOnlineOnly:
                 **get_payload_info(records),
             )
 
-        if return_type_codes:
-            # Get a list of dicts with proper field names
-            # (i.e. records in the pandas sense)
-            # (e.g. {'media_object_id': 'LONGLONG', 'full_path': 'VAR_STRING'}
-            type_codes = {v[0]: FIELD_TYPE_DICT[v[1]] for v in fields}
-
-            return records, type_codes
-        else:
-            return records
+        return records
 
     @property
     def databases(self) -> list[str]:
@@ -1235,7 +1243,7 @@ class _TonyDBCOnlineOnly:
                        ({", ".join(stringified_row_dict.keys())})
                 VALUES ({", ".join(["%s" for _ in stringified_row_dict])})
             """
-        command_values: list[str, Any] = list(map(str, stringified_row_dict.values()))
+        command_values: tuple[Any, ...] = tuple(map(str, stringified_row_dict.values()))
         self.execute(command=command, command_values=command_values)
 
     @contextmanager
@@ -1694,9 +1702,8 @@ class TonyDBC(_TonyDBCOnlineOnly):
     def get_data(
         self,
         query: str,
-        before_retry_cmd=None,
+        before_retry_cmd: str | None = None,
         no_tracking: bool = False,
-        return_type_codes: bool = False,
     ) -> Any:
         if not self.is_online:
             raise AssertionError("get_data can only be used while online")
@@ -1705,7 +1712,6 @@ class TonyDBC(_TonyDBCOnlineOnly):
                 query=query,
                 before_retry_cmd=before_retry_cmd,
                 no_tracking=no_tracking,
-                return_type_codes=return_type_codes,
             )
 
     def drop_database(self, database: str) -> None:
@@ -1820,7 +1826,7 @@ class TonyDBC(_TonyDBCOnlineOnly):
         }
 
         if self.is_online:
-            super(TonyDBC, self).insert_row_all_string(**kwargs)
+            super(TonyDBC, self).insert_row_all_string(table, row_dict)
         else:
             self.__update_queue.put(("insert_row_all_string", kwargs))
 

@@ -38,8 +38,13 @@ ruff format .
 # Check that all tests have passed
 pytest -s -v -x
 
+# Make any code changes, then repeat the above tests until they pass
+
 # python -m pip install build twine bumpver
 bumpver update --patch
+
+# Commit and push all of the above changes, if any, to the repo
+
 python -m build
 twine check dist/*
 # twine upload -r testpypi dist/*
