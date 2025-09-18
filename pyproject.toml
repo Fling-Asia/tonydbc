@@ -47,7 +47,8 @@ dev = [
   "pandas-stubs",
   "types-pytz",
   "types-python-dateutil",
-  "types-docker"
+  "types-docker",
+  "twine"
 ]
 test = [
   "pytest>=7.0.0",
