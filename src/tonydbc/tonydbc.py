@@ -633,7 +633,12 @@ class _TonyDBCOnlineOnly:
         else:
             columns_to_serialize = []
 
-        df_serialized = serialize_table(df, col_dtypes, columns_to_serialize)
+        df_serialized = serialize_table(
+            cur_df=df,
+            col_dtypes=col_dtypes,
+            columns_to_serialize=columns_to_serialize,
+            session_timezone=self.session_timezone,
+        )
 
         # Append our values to the actual database table
         self.log(
@@ -1309,7 +1314,12 @@ class _TonyDBCOnlineOnly:
         else:
             columns_to_serialize = []
 
-        df_serialized = serialize_table(df, col_dtypes, columns_to_serialize)
+        df_serialized = serialize_table(
+            cur_df=df,
+            col_dtypes=col_dtypes,
+            columns_to_serialize=columns_to_serialize,
+            session_timezone=self.session_timezone,
+        )
         payload_info = get_payload_info(df_serialized)
         payload_size_MB = payload_info["payload_size"] / (1024**2)
 

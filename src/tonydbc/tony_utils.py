@@ -49,7 +49,10 @@ class NumpyEncoder(json.JSONEncoder):
 
 
 def serialize_table(
-    cur_df: pd.DataFrame, col_dtypes: dict[str, Any], columns_to_serialize: list[str]
+    cur_df: pd.DataFrame,
+    col_dtypes: dict[str, Any],
+    columns_to_serialize: list[str],
+    session_timezone: str,
 ) -> pd.DataFrame:
     # If we don't make a copy, we will create side effects in the original cur_df
     cur_df = cur_df.copy()
@@ -57,6 +60,24 @@ def serialize_table(
     # Nothing to convert if it's empty
     if len(cur_df) == 0:
         return cur_df
+
+    # Handle datetime columns BEFORE generic type conversion
+    # Convert timezone-aware datetime columns to MariaDB-compatible strings
+    for col, target_dtype in col_dtypes.items():
+        if col in cur_df.columns and target_dtype == "string":
+            col_data = cur_df[col]
+            # Check if this is a datetime column that needs special handling
+            if hasattr(col_data, "dt") and hasattr(col_data.dt, "tz"):
+                if col_data.dt.tz is not None:
+                    # Convert timezone-aware datetime to MariaDB format
+                    # First convert to session timezone, then remove timezone info
+                    col_data_naive = col_data.dt.tz_convert(
+                        session_timezone
+                    ).dt.tz_localize(None)
+                    # Convert to MariaDB-compatible string format
+                    cur_df[col] = col_data_naive.dt.strftime(
+                        "%Y-%m-%d %H:%M:%S.%f"
+                    ).astype("string")
 
     # Exclude columns which are not present in the table
     columns_to_serialize0 = list(

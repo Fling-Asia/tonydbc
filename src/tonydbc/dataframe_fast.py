@@ -201,14 +201,18 @@ class DataFrameFast(pd.DataFrame):
             for dt_col in dt_cols.keys():
                 # I think this is okay if we were careful to have the column's data
                 # in the current session's datetime format
-                new_col = (
-                    df0.loc[:, dt_col]
-                    # Convert to the correct time zone if necessary
-                    .dt.tz_convert(session_timezone)
-                    # Convert to a string for mariadb to digest
-                    .dt.strftime("%Y-%m-%d %H:%M:%S.%f")
-                    .astype("string")
-                )
+                # Convert timezone-aware timestamps to MariaDB-compatible strings
+                col_data = df0.loc[:, dt_col]
+
+                # Convert to the target timezone if necessary
+                if col_data.dt.tz is not None:
+                    # Convert to target timezone, then remove timezone info for MariaDB
+                    col_data = col_data.dt.tz_convert(session_timezone).dt.tz_localize(
+                        None
+                    )
+
+                # Convert to string format that MariaDB accepts
+                new_col = col_data.dt.strftime("%Y-%m-%d %H:%M:%S.%f").astype("string")
 
                 # Directly assign the converted datetime strings without intermediate assignments
                 # This avoids the pandas FutureWarning about incompatible dtype assignment
@@ -218,10 +222,10 @@ class DataFrameFast(pd.DataFrame):
                 df0[dt_col] = SeriesCtor(new_col, dtype="string", index=df0.index)
 
         # Convert boolean columns to integers for MariaDB TINYINT(1) compatibility
-        bool_cols = {
+        bool_cols: dict[str, Any] = {
             col: dtype
             for col, dtype in df0.dtypes.to_dict().items()
-            if str(dtype) == "boolean"
+            if str(dtype) == "boolean" or isinstance(dtype, bool)
         }
         for col in bool_cols:
             # Convert boolean to int (True->1, False->0, pd.NA->None)
@@ -270,8 +274,10 @@ class DataFrameFast(pd.DataFrame):
             # Identify boolean columns and convert them to int (1 for True, 0 for False)
             # to avoid the warning: ('Warning', 1366, "Incorrect integer value:
             # 'False' for column michael_db.cats.is_success at row 1")
-            bool_cols = df0.select_dtypes(include=["bool"]).columns
-            df0[bool_cols] = df0[bool_cols].astype(int)
+            bool_cols_to_exclude: list[str] = list(
+                df0.select_dtypes(include=["bool", "boolean"]).columns
+            )
+            df0[bool_cols_to_exclude] = df0[bool_cols_to_exclude].astype(int)
 
             # Convert to csv for uploading to the server as a file, which is faster
             # for some reason

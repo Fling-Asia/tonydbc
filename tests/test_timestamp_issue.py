@@ -621,17 +621,33 @@ def test_column_type_inspection(setup_tables: Any) -> None:
         for col, expected_type in col_dtypes.items():
             if col in videos_df.columns:
                 actual_dtype = videos_df[col].dtype
-                # Simple compatibility check
-                is_compatible = (
-                    (expected_type is str and "object" in str(actual_dtype))
-                    or (expected_type is int and "int" in str(actual_dtype))
-                    or (expected_type is float and "float" in str(actual_dtype))
-                    or (expected_type is bool and "bool" in str(actual_dtype))
-                )
+                # Handle both old type objects and new string-based datatypes
+                if isinstance(expected_type, str):
+                    expected_type_name = expected_type
+                    # Simple compatibility check for string-based datatypes
+                    is_compatible = (
+                        (expected_type == "string" and "object" in str(actual_dtype))
+                        or (
+                            expected_type in ["Int64", "Int32", "Int16", "Int8"]
+                            and "int" in str(actual_dtype)
+                        )
+                        or (expected_type == "Float64" and "float" in str(actual_dtype))
+                        or (expected_type == "boolean" and "bool" in str(actual_dtype))
+                        or (expected_type == "object" and "object" in str(actual_dtype))
+                    )
+                else:
+                    # Legacy support for type objects
+                    expected_type_name = expected_type.__name__
+                    is_compatible = (
+                        (expected_type is str and "object" in str(actual_dtype))
+                        or (expected_type is int and "int" in str(actual_dtype))
+                        or (expected_type is float and "float" in str(actual_dtype))
+                        or (expected_type is bool and "bool" in str(actual_dtype))
+                    )
                 match_symbol = "✅" if is_compatible else "❌"
 
                 print(
-                    f"{col:<25} | {expected_type.__name__:<15} | {str(actual_dtype):<20} | {match_symbol}"
+                    f"{col:<25} | {expected_type_name:<15} | {str(actual_dtype):<20} | {match_symbol}"
                 )
 
         # Special focus on timestamp columns
