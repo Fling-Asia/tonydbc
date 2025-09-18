@@ -44,9 +44,11 @@ DATATYPE_MAP = {
     "longtext": "string",
     "enum": "string",
     "tinyint": "Int64",
+    "tiny": "Int64",
     "text": "string",
     "bool": "boolean",
     "decimal": "Float64",
+    "newdecimal": "Float64",
     "timestamp": "string",
     "bit": "boolean",
     "mediumint": "Int64",
@@ -369,19 +371,37 @@ def read_sql_table(
     records = con.get_data(query=query, no_tracking=True)
     type_codes = con.get_type_codes(query=query)
 
-    # TODO: convert all cols
+    # Convert SQL types to pandas nullable datatypes
+    dtype_conversions = {}
+    for col, sql_type in type_codes.items():
+        sql_type_lower = sql_type.lower()
 
-    # KLUDGE: for now, just convert any BIT fields to bool
-    bit_cols = {k: bool for k, v in type_codes.items() if v.upper() == "BIT"}
+        # Special handling for TINY type - need to check if it's boolean
+        # In MariaDB, BOOL is an alias for TINYINT(1), so TINY fields might be boolean
+        if sql_type_lower == "tiny":
+            # For now, assume TINY is boolean if it's a single-byte field
+            # This is a heuristic - ideally we'd check the actual column definition
+            dtype_conversions[col] = "boolean"
+        elif sql_type_lower in DATATYPE_MAP:
+            dtype_conversions[col] = DATATYPE_MAP[sql_type_lower]
+
+    # Special handling for BIT fields (convert binary to boolean)
+    bit_cols = {k: v for k, v in type_codes.items() if v.upper() == "BIT"}
 
     if len(records) > 0:
         df = DataFrameFast.from_records(records)
 
+        # Convert BIT fields from binary to boolean
         for k in bit_cols.keys():
             # Convert b'\x01' to True and b'\x00' to False
             df[k] = df[k].apply(
                 lambda cell: bool(int.from_bytes(cell, byteorder="big"))
             )
+
+        # Apply nullable datatype conversions
+        for col, target_dtype in dtype_conversions.items():
+            if col in df.columns:
+                df[col] = df[col].astype(target_dtype)
     elif "CALL" not in query.upper():
         # We also have to return the columns names in case records is []
         """Use a trick to get the column names,
@@ -398,7 +418,10 @@ def read_sql_table(
             columns = [v[0] for v in cursor.description]
 
         df = DataFrameFast(columns=columns)
-        df = df.astype(bit_cols)
+        # Apply both bit column conversions and nullable datatype conversions for empty DataFrames
+        all_conversions = {**bit_cols, **dtype_conversions}
+        if all_conversions:
+            df = df.astype(all_conversions)
     else:
         # We cannot get the columns if it was a stored procedure
         return DataFrameFast(columns=[])

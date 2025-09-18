@@ -1157,10 +1157,23 @@ class _TonyDBCOnlineOnly:
             if len(result) == 0:
                 raise KeyError(f"Table {table} does not seem to exist.")
             # We need to map Types like "bigint(20)" to "bigint" to match our DATATYPE_MAP
-            col_datatypes = {
-                v["Field"]: DATATYPE_MAP[v["Type"].split("(")[0].strip().lower()]
-                for v in result
-            }
+            # Special case: tinyint(1) is actually BOOL in MariaDB
+            col_datatypes = {}
+            for v in result:
+                field_name = v["Field"]
+                sql_type = v["Type"].strip().lower()
+
+                # Special handling for boolean (tinyint(1))
+                if sql_type == "tinyint(1)":
+                    col_datatypes[field_name] = "boolean"
+                else:
+                    # Regular handling - strip size specification
+                    base_type = sql_type.split("(")[0].strip()
+                    if base_type in DATATYPE_MAP:
+                        col_datatypes[field_name] = DATATYPE_MAP[base_type]
+                    else:
+                        # Fallback to object for unknown types
+                        col_datatypes[field_name] = "object"
             return col_datatypes
 
     @property
