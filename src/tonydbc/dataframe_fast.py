@@ -34,6 +34,7 @@ DATATYPE_MAP = {
     "smallint": "Int64",
     "datetime": "string",
     "var_string": "string",
+    "string": "string",
     "varchar": "string",
     "char": "string",
     "blob": "object",  # Keep as object for binary data
@@ -455,7 +456,7 @@ def read_sql_table(
     # Convert SQL types to pandas nullable datatypes
     dtype_conversions = {}
     for col, sql_type in type_codes.items():
-        sql_type_lower = sql_type.lower()
+        sql_type_lower: str = sql_type.lower()
 
         # Special handling for TINY type - need to check if it's boolean
         # In MariaDB, BOOL is an alias for TINYINT(1), so TINY fields might be boolean
@@ -468,7 +469,7 @@ def read_sql_table(
         else:
             # Raise error for unknown types
             raise ValueError(
-                f"Unknown SQL type '{sql_type}' for column '{col}'. Please add it to DATATYPE_MAP."
+                f"Unknown SQL type '{sql_type_lower}' for column '{col}'. Please add it to DATATYPE_MAP."
             )
 
     # Special handling for BIT fields (convert binary to boolean)
