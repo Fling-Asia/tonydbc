@@ -30,6 +30,7 @@ DATATYPE_MAP = {
     "float": "Float64",
     "int": "Int64",
     "longlong": "Int64",
+    "long": "Int64",
     "smallint": "Int64",
     "datetime": "string",
     "var_string": "string",
@@ -44,6 +45,7 @@ DATATYPE_MAP = {
     "longtext": "string",
     "enum": "string",
     "tinyint": "Int64",
+    "tinyint(1)": "boolean",  # TODO: actually, this could be anything from -127 to 128 but we'll just assume boolean for now
     "tiny": "Int64",
     "text": "string",
     "bool": "boolean",
@@ -68,6 +70,69 @@ DATATYPE_MAP = {
 # 'MEDIUM_BLOB', 'NEWDATE', 'NEWDECIMAL', 'NULL', 'SET', 'SHORT', 'STRING',
 # 'TIME', 'TIME2', 'TIMESTAMP', 'TIMESTAMP2', 'TINY', 'TINY_BLOB', 'VARCHAR',
 # 'VAR_STRING', 'YEAR'
+
+
+def refine_dtype(data_type: str, column_type: str):
+    """
+    You can get this information from e.g.
+
+        SELECT DATA_TYPE, COLUMN_TYPE
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = 'your_database'
+        AND TABLE_NAME = 'your_table';
+
+    """
+    data_type = data_type.lower()
+    column_type = column_type.lower()
+
+    # 1) boolean synonyms / tinyint(1)
+    if data_type in ("bool", "boolean"):
+        return "boolean"
+    if data_type == "tinyint":
+        # Treat tinyint(1) as boolean ONLY if truly boolean
+        if column_type == "tinyint(1)":
+            # optional: whitelist by name convention or check constraints
+            return "boolean"
+        # otherwise keep as small int
+        return "Int8"
+
+    # 2) BIT
+    if data_type == "bit":
+        if column_type == "bit(1)":
+            return "boolean"
+        # For bit(n>1): either keep bytes or convert yourself later
+        return "object"
+
+    # 3) unsigned integers
+    if data_type in ("tinyint", "smallint", "mediumint", "int", "integer", "bigint"):
+        unsigned = "unsigned" in column_type
+        if unsigned:
+            return {
+                "tinyint": "UInt8",
+                "smallint": "UInt16",
+                "mediumint": "UInt32",
+                "int": "UInt32",
+                "integer": "UInt32",
+                "bigint": "UInt64",
+            }[data_type]
+        else:
+            return {
+                "tinyint": "Int8",
+                "smallint": "Int16",
+                "mediumint": "Int32",
+                "int": "Int32",
+                "integer": "Int32",
+                "bigint": "Int64",
+            }[data_type]
+
+    # 4) decimals: consider precision
+    if data_type in ("decimal", "newdecimal", "numeric"):
+        # If you care about exactness, pick 'object' (Decimal) instead of Float64
+        return "Float64"
+
+    # otherwise use base
+    return "object"
+
 
 # Get a lookup of what all the data_types are
 FIELD_TYPE = mariadb.constants.FIELD_TYPE
@@ -151,6 +216,16 @@ class DataFrameFast(pd.DataFrame):
                 # Note: we need to create SeriesCtor to satisfy mypy's "Series[Any]" not collable [operator] error
                 SeriesCtor = cast(type[pd.Series], pd.Series)
                 df0[dt_col] = SeriesCtor(new_col, dtype="string", index=df0.index)
+
+        # Convert boolean columns to integers for MariaDB TINYINT(1) compatibility
+        bool_cols = {
+            col: dtype
+            for col, dtype in df0.dtypes.to_dict().items()
+            if str(dtype) == "boolean"
+        }
+        for col in bool_cols:
+            # Convert boolean to int (True->1, False->0, pd.NA->None)
+            df0[col] = df0[col].astype("Int64")
 
         # Convert np.int64 columns to np.int32 since MySQL cannot accept np.int64 as a param
         small_int64cols = {
@@ -384,6 +459,11 @@ def read_sql_table(
             dtype_conversions[col] = "boolean"
         elif sql_type_lower in DATATYPE_MAP:
             dtype_conversions[col] = DATATYPE_MAP[sql_type_lower]
+        else:
+            # Raise error for unknown types
+            raise ValueError(
+                f"Unknown SQL type '{sql_type}' for column '{col}'. Please add it to DATATYPE_MAP."
+            )
 
     # Special handling for BIT fields (convert binary to boolean)
     bit_cols = {k: v for k, v in type_codes.items() if v.upper() == "BIT"}

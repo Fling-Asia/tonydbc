@@ -337,10 +337,10 @@ class TestTonyDBCIntegration:
         assert "id" in result
         assert "name" in result
         assert "email" in result
-        # The exact types may vary, but they should be present
-        assert result["id"] in [int, "int"]
-        assert result["name"] in [str, "str"]
-        assert result["email"] in [str, "str"]
+        # The exact types may vary, but they should be present (now using nullable datatypes)
+        assert result["id"] in [int, "int", "Int64"]
+        assert result["name"] in [str, "str", "string"]
+        assert result["email"] in [str, "str", "string"]
 
     def test_temp_id_table_real_db(self, setup_tables):
         """Test creating temporary ID table with real database"""
