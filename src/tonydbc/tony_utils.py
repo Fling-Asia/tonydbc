@@ -154,28 +154,39 @@ def deserialize_table(
     # Deserialize the relevant columns from strings into nested arrays of dicts and lists
     for c in columns_to_deserialize0:
         try:
-            cur_df.loc[:, [c]] = cur_df.loc[:, [c]].fillna("nan")
+            cur_dtype = cur_df.loc[:, c].dtype
         except KeyError as e:
             if get_env_bool("INTERACT_AFTER_ERROR"):
                 print(f"KEY ERROR {e}")
                 code.interact(local=locals(), banner=f"{e}")
             else:
                 raise KeyError(e)
+        # Check that we are deserializing a string-like column
+        is_string_like = (pd.api.types.is_string_dtype(cur_dtype)) and (
+            not pd.api.types.is_object_dtype(cur_dtype)
+        )
+        if not is_string_like and not (cur_df.is_empty):
+            raise TypeError(
+                f"We cannot deserialize column {c} because it is non-empty and of dtype {cur_dtype}."
+                "Please cast to 'string' first."
+            )
+        cur_df.loc[:, [c]] = cur_df.loc[:, [c]].fillna("nan")
 
         def json_loads(v):
             try:
-                return json.loads(v[c]) if v[c] not in ["nan", "None"] else np.nan
+                return json.loads(v[c]) if v[c] not in ["nan", "None"] else pd.NA
             except json.decoder.JSONDecodeError as e:
                 print(
                     f"tonydbc.deserialize_table JSON DECODE ERROR: column {c} row {v.name}: {v[c]}: {e}"
                 )
-                return np.nan
+                return pd.NA
             except TypeError as e:
                 print(
                     f"tonydbc.deserialize_table ERROR: column {c} row {v.name}: {v[c]}: {e}"
                 )
-                return np.nan
+                return pd.NA
 
+        cur_df[c] = cur_df[c].astype("object")
         cur_df.loc[:, [c]] = cur_df.loc[:, [c]].apply(json_loads, axis=1)
 
     # CONVERT all pd.Timestamp objects (which have been provided by mariadb
