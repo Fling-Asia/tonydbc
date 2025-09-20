@@ -98,6 +98,8 @@ def serialize_table(
         except TypeError as e:
             raise TypeError(f"Column {c} could not be serialized; {e}")
 
+    return cur_df
+
     # Serialization approach #1 (older): cast int and also float.
     # We don't do ndarray anymore.  (we just use lists of lists and we do that with approach 2 below)
     # Now cast the non-ndarray columns
@@ -163,13 +165,13 @@ def deserialize_table(
             else:
                 raise KeyError(e)
         # Check that we are deserializing a string-like column
-        is_string_like = (pd.api.types.is_string_dtype(cur_dtype)) and (
+        is_string_or_obj_like = (pd.api.types.is_string_dtype(cur_dtype)) or (
             not pd.api.types.is_object_dtype(cur_dtype)
         )
-        if not is_string_like and not (cur_df.is_empty):
+        if not is_string_or_obj_like and not cur_df.empty:
             raise TypeError(
                 f"We cannot deserialize column {c} because it is non-empty and of dtype {cur_dtype}."
-                "Please cast to 'string' first."
+                "Please cast to 'string' or object first."
             )
         cur_df.loc[:, [c]] = cur_df.loc[:, [c]].fillna("nan")
 
