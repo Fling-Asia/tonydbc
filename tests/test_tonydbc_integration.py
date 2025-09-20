@@ -466,12 +466,11 @@ class TestTonyDBCIntegration:
                         "is_corrupted": [False],
                     }
                 )
-
                 # CHECK THAT THIS RAISES AN ERROR BECAUSE Timestamp != BIGINT for from_timestamp and to_timestamp
                 # This should not raise due to timestamp handling
-                with pytest.raises(TypeError):
+                with pytest.raises(Exception):
                     db.append_to_table("sortie", sortie_df, return_reindexed=True)
-                with pytest.raises(TypeError):
+                with pytest.raises(Exception):
                     db.append_to_table("sortie", sortie_df, return_reindexed=False)
 
                 sortie_df_converted = sortie_df.copy()

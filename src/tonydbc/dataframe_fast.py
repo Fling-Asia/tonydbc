@@ -12,6 +12,7 @@ NOTE: Works only with mariadb's connector for now (pip3 install mariadb)
 
 """
 
+import code
 import csv
 import os
 import tempfile
