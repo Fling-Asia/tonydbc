@@ -12,7 +12,6 @@ NOTE: Works only with mariadb's connector for now (pip3 install mariadb)
 
 """
 
-import code
 import csv
 import os
 import tempfile
@@ -283,10 +282,11 @@ class DataFrameFast(pd.DataFrame):
             # Convert to csv for uploading to the server as a file, which is faster
             # for some reason
             # the fillna is to handle NULLs
-            df0.fillna("\\N").to_csv(
+            df0.to_csv(
                 tmp_filepath,
                 index=False,
                 header=True,
+                na_rep="\\N",  # ← this prints pd.NA/NaN as \N
                 quotechar=ENCLOSURE_CHAR,
                 quoting=csv.QUOTE_ALL,
                 sep=FIELD_DELIMITER,
