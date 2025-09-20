@@ -123,20 +123,21 @@ def serialize_table(
     # If we explicitly cast string columns to str instead of leaving them as object
     # then None values will be replaced with 'None' and won't insert properly into the database
     # so we don't bother to cast to str (object will work fine anyway)
-    try:
-        cur_df = cur_df.astype(
-            {
-                col: dt
-                for col, dt in dict(col_dtypes).items()
-                if dt != np.ndarray and dt is not str and col in cur_df.columns
-            }
-        )
-    except ValueError:
+    for k, dtype in col_dtypes.items():
+        if k not in cur_df.columns:
+            continue
+        if dtype == np.ndarray or pd.api.types.is_string_dtype(dtype):
+            continue
         # We will end up here if one of the values in an int column is a np.nan since np.nan cnanot be cast to int
         # so let's ignore this error (??)
         # TODO: fix KLUDGE (maybe iterate through each separately so at least we don't break early in the
         # conversion process)
-        pass
+        try:
+            cur_df[k] = cur_df[k].astype(dtype)
+        except Exception as e:
+            raise RuntimeError(
+                f"Column {k} with dtype {cur_df[k].dtype} could not be converted to {dtype}: {e}"
+            )
 
     return cur_df
 
