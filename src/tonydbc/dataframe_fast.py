@@ -63,6 +63,7 @@ DATATYPE_MAP = {
     "int1": "Int64",
     "middleint": "Int64",
     "serial": "Int64",
+    "json": "string"
 }
 
 # TODO: HANDLE ALL THESE:
