@@ -17,6 +17,8 @@ import pandas as pd
 import pytest
 from mariadb.constants.CLIENT import MULTI_STATEMENTS  # type: ignore
 
+from tonydbc.tony_utils import get_tz_offset
+
 # Set required environment variables BEFORE importing tonydbc
 os.environ.setdefault("USE_PRODUCTION_DATABASE", "False")
 os.environ.setdefault("CHECK_ENVIRONMENT_INTEGRITY", "False")
@@ -231,12 +233,15 @@ class TestTonyDBCOnlineOnly:
         """Test set_timezone using DEFAULT_TIMEZONE environment variable"""
         db, mock_conn, mock_cursor = tonydbc_instance
 
+        # Get the actual expected offset for Europe/London
+        expected_offset = get_tz_offset("Europe/London")
+
         # Mock the timezone query that set_timezone calls
         with (
             patch.object(db, "get_data") as mock_get_data,
             patch.dict(os.environ, {"DEFAULT_TIMEZONE": "Europe/London"}),
         ):
-            mock_get_data.return_value = [{"@@session.time_zone": "+01:00"}]
+            mock_get_data.return_value = [{"@@session.time_zone": expected_offset}]
 
             db.set_timezone()
 
