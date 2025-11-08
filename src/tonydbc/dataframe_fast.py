@@ -27,7 +27,9 @@ from .env_utils import get_env_bool
 # Map SQL types to pandas nullable datatypes
 DATATYPE_MAP = {
     "double": "Float64",
+    "double unsigned": "Float64",
     "float": "Float64",
+    "float unsigned": "Float64",
     "int": "Int64",
     "longlong": "Int64",
     "long": "Int64",
