@@ -3,6 +3,9 @@ Comprehensive unit tests for EVERY method in the TonyDBC class.
 
 This test suite provides complete coverage of all TonyDBC methods using mocks
 to avoid requiring actual database connections for unit testing.
+
+Note: These tests use mocks and don't connect to real databases, but for
+consistency they use safe environment variables that point to test values.
 """
 
 import os
@@ -19,17 +22,18 @@ from mariadb.constants.CLIENT import MULTI_STATEMENTS  # type: ignore
 
 from tonydbc.tony_utils import get_tz_offset
 
-# Set required environment variables BEFORE importing tonydbc
+# Set safe environment variables BEFORE importing tonydbc
+# These are safe test values since unit tests use mocks anyway
 os.environ.setdefault("USE_PRODUCTION_DATABASE", "False")
 os.environ.setdefault("CHECK_ENVIRONMENT_INTEGRITY", "False")
 os.environ.setdefault("INTERACT_AFTER_ERROR", "False")
 os.environ.setdefault("DEFAULT_TIMEZONE", "UTC")
-os.environ.setdefault("MYSQL_DATABASE", "test")
-os.environ.setdefault("MYSQL_HOST", "localhost")
-os.environ.setdefault("MYSQL_READWRITE_USER", "test")
-os.environ.setdefault("MYSQL_READWRITE_PASSWORD", "test")
+os.environ.setdefault("MYSQL_DATABASE", "test_unit")
+os.environ.setdefault("MYSQL_HOST", "test_host")  # Safe mock value
+os.environ.setdefault("MYSQL_READWRITE_USER", "test_user")
+os.environ.setdefault("MYSQL_READWRITE_PASSWORD", "test_pass")
 os.environ.setdefault("MYSQL_PRODUCTION_DATABASE", "test_prod")
-os.environ.setdefault("MYSQL_TEST_DATABASE", "test")
+os.environ.setdefault("MYSQL_TEST_DATABASE", "test_unit")
 
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))

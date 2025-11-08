@@ -1,142 +1,31 @@
 """
-Integration tests for TonyDBC using real MariaDB containers
+Integration tests for TonyDBC using fresh MariaDB containers
 
-This test file uses real MariaDB database containers (via testcontainers)
+This test file uses fresh MariaDB database containers from conftest.py
 to test TonyDBC functionality with actual database interactions,
-rather than mocking database calls.
+ensuring tests never connect to production databases.
 """
 
 import os
 import sys
 import time
 from pathlib import Path
-from types import SimpleNamespace
-from typing import Any, Generator
 
-import mariadb  # type: ignore
 import pandas as pd
 import pytest
-from mariadb.constants.CLIENT import MULTI_STATEMENTS  # type: ignore
-
-# Set required environment variables BEFORE importing tonydbc
-os.environ.setdefault("USE_PRODUCTION_DATABASE", "False")
-os.environ.setdefault("CHECK_ENVIRONMENT_INTEGRITY", "False")
-os.environ.setdefault("INTERACT_AFTER_ERROR", "False")
-os.environ.setdefault("DEFAULT_TIMEZONE", "UTC")
-os.environ.setdefault("MYSQL_DATABASE", "test")
-os.environ.setdefault("MYSQL_HOST", "localhost")
-os.environ.setdefault("MYSQL_READWRITE_USER", "test")
-os.environ.setdefault("MYSQL_READWRITE_PASSWORD", "test")
-os.environ.setdefault("MYSQL_PRODUCTION_DATABASE", "test_prod")
-os.environ.setdefault("MYSQL_TEST_DATABASE", "test_db")
 
 # Add the src directory to the path so we can import tonydbc
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from testcontainers.core.container import DockerContainer
-
 import tonydbc
 
 
-def _wait_db(
-    host: str, port: int, user: str, pwd: str, db: str, timeout: int = 30
-) -> None:
-    """Wait for database to be ready"""
-    start_time = time.time()
-    while time.time() - start_time < timeout:
-        try:
-            conn = mariadb.connect(
-                host=host,
-                port=port,
-                user=user,
-                password=pwd,
-                database=db,
-                client_flag=MULTI_STATEMENTS,
-            )
-            conn.close()
-            print(f"✅ Database ready at {host}:{port}")
-            return
-        except Exception as e:
-            print(f"⏳ Waiting for database... ({e})")
-            time.sleep(1)
-    raise TimeoutError(f"Database not ready after {timeout} seconds")
-
-
-@pytest.fixture(scope="session")
-def mariadb_container() -> Generator[Any, None, None]:
-    """Create a MariaDB container for testing"""
-
-    user, pwd, db = "test", "test", "test"
-    container = (
-        DockerContainer("mariadb:10.6")
-        .with_env("MYSQL_ROOT_PASSWORD", "root")
-        .with_env("MYSQL_DATABASE", db)
-        .with_env("MYSQL_USER", user)
-        .with_env("MYSQL_PASSWORD", pwd)
-        .with_exposed_ports(3306)
-    )
-
-    with container as c:
-        host = c.get_container_host_ip()
-        port = int(c.get_exposed_port(3306))
-        _wait_db(host, port, user, pwd, db, timeout=120)
-
-        yield SimpleNamespace(
-            get_container_host_ip=lambda: host,
-            get_exposed_port=lambda _p: port,
-            username=user,
-            password=pwd,
-            dbname=db,
-            container=c,
-        )
-
-
-@pytest.fixture(scope="session")
-def tonydbc_instance(mariadb_container: Any) -> Any:
-    """Create a TonyDBC instance connected to the test container"""
-    container_host = mariadb_container.get_container_host_ip()
-    container_port = mariadb_container.get_exposed_port(3306)
-
-    # Override environment variables with actual container details
-    container_env = {
-        "MYSQL_HOST": container_host,
-        "MYSQL_PORT": str(container_port),
-        "MYSQL_READWRITE_USER": mariadb_container.username,
-        "MYSQL_READWRITE_PASSWORD": mariadb_container.password,
-        "MYSQL_DATABASE": mariadb_container.dbname,
-        "MYSQL_TEST_DATABASE": mariadb_container.dbname,
-        "DEFAULT_TIMEZONE": "UTC",
-    }
-
-    # Apply the container environment
-    original_env = {}
-    for key, value in container_env.items():
-        original_env[key] = os.environ.get(key)
-        os.environ[key] = value
-
-    try:
-        # Create TonyDBC instance
-        db = tonydbc.TonyDBC(
-            host=container_host,
-            port=container_port,
-            user=mariadb_container.username,
-            password=mariadb_container.password,
-            database=mariadb_container.dbname,
-        )
-        yield db
-    finally:
-        # Restore original environment
-        for key, value in original_env.items():
-            if value is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = value
-
+# Container setup and fixtures are now provided by conftest.py
 
 @pytest.fixture
-def setup_tables(tonydbc_instance):
+def setup_tables(fresh_tonydbc_instance):
     """Set up test tables in the database"""
-    with tonydbc_instance as db:
+    with fresh_tonydbc_instance as db:
         # Create a table with a primary key
         db.execute("""
             CREATE TABLE IF NOT EXISTS test_table (
@@ -364,9 +253,9 @@ class TestTonyDBCIntegration:
         with pytest.raises(Exception):
             db.get_data(f"SELECT * FROM {temp_table_name}")
 
-    def test_sortie_append_with_timestamps(self, tonydbc_instance):
+    def test_sortie_append_with_timestamps(self, fresh_tonydbc_instance):
         """Create `sortie` table and append a tz-aware dataframe without errors."""
-        with tonydbc_instance as db:
+        with fresh_tonydbc_instance as db:
             # Create referenced tables for foreign keys
             db.execute(
                 """

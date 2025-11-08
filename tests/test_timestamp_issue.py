@@ -1,204 +1,38 @@
 """
 Test script to reproduce and fix the timestamp issue with MariaDB Connector/Python
 
-This test creates a local MariaDB database using testcontainers, creates the video table,
-and tests inserting data with TIMESTAMP columns to reproduce the error:
-"Data type 'Timestamp' in column X not supported in MariaDB Connector/Python"
+This test uses fresh MariaDB database containers from conftest.py to test
+inserting data with TIMESTAMP columns, ensuring tests never connect to production.
 """
 
 import os
 import sys
 import time
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any, Generator
 
-import mariadb  # type: ignore
 import pandas as pd
 import pytest
-from mariadb.constants.CLIENT import MULTI_STATEMENTS  # type: ignore
-
-# Set required environment variables BEFORE importing tonydbc
-# This prevents KeyError during module import
-os.environ.setdefault("USE_PRODUCTION_DATABASE", "False")
-os.environ.setdefault("CHECK_ENVIRONMENT_INTEGRITY", "False")
-os.environ.setdefault("INTERACT_AFTER_ERROR", "False")
-os.environ.setdefault("DEFAULT_TIMEZONE", "UTC")
-os.environ.setdefault("MYSQL_DATABASE", "test")
-os.environ.setdefault("MYSQL_HOST", "localhost")
-os.environ.setdefault("MYSQL_READWRITE_USER", "test")
-os.environ.setdefault("MYSQL_READWRITE_PASSWORD", "test")
-os.environ.setdefault("MYSQL_PRODUCTION_DATABASE", "test_prod")
-os.environ.setdefault("MYSQL_TEST_DATABASE", "test_db")
 
 # Add the src directory to the path so we can import tonydbc
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-# from testcontainers.mysql import MySqlContainer as MariaDbContainer
-from testcontainers.core.container import DockerContainer
-
 import tonydbc
 
 
-def _wait_db(
-    host: str, port: int, user: str, pwd: str, db: str, timeout: int = 120
-) -> None:
-    start = time.time()
-    last_err = None
-    while time.time() - start < timeout:
-        try:
-            conn = mariadb.connect(
-                host=host, port=int(port), user=user, password=pwd, database=db
-            )
-            conn.close()
-            return
-        except Exception as e:
-            last_err = e
-            time.sleep(1)
-    raise TimeoutError(f"DB not ready in {timeout}s; last error: {last_err}")
+# Container setup and fixtures are now provided by conftest.py
+
+# Legacy fixture for backward compatibility
+@pytest.fixture(scope="function")
+def tonydbc_instance(fresh_tonydbc_instance):
+    """Legacy alias for fresh_tonydbc_instance"""
+    return fresh_tonydbc_instance
 
 
-@pytest.fixture(scope="session")
-def mariadb_container() -> Generator[Any, None, None]:
-    """Create a MariaDB container for testing (no deprecated waits)."""
-    user = pwd = "test"
-    db = "test"
-    container = (
-        DockerContainer("mariadb:11.4")
-        .with_env("MYSQL_ROOT_PASSWORD", "test")
-        .with_env("MYSQL_DATABASE", "test")
-        .with_env("MYSQL_USER", "test")
-        .with_env("MYSQL_PASSWORD", "test")
-        .with_exposed_ports(3306)
-    )
-    with container as c:
-        # WE CANNOT USE THIS due to a deprecation warning in testcontainers (as of version 4.13.0)
-        # Wait for the DB to actually be ready
-        # wait_for_logs(container, r"(mariadbd|mysqld): ready for connections\.", timeout=120)
-        # Instead, we "roll our own" wait for the DB to be ready
-
-        host = c.get_container_host_ip()
-        port = int(c.get_exposed_port(3306))
-
-        _wait_db(host, port, user, pwd, db, timeout=120)
-
-        # Yield a lightweight handle with the bits your tests use
-        yield SimpleNamespace(
-            get_container_host_ip=lambda: host,
-            get_exposed_port=lambda _p: port,
-            username=user,
-            password=pwd,
-            dbname=db,
-            container=c,  # keep original if you need it
-        )
-
-
-@pytest.fixture(scope="session")
-def tonydbc_instance(mariadb_container: Any) -> Any:
-    """Create a TonyDBC instance connected to the test container"""
-    # Get the actual container connection details
-    container_host = mariadb_container.get_container_host_ip()
-    container_port = mariadb_container.get_exposed_port(3306)
-
-    # DEBUG: Print the actual container details
-    print(f"DEBUG: Container host = {container_host}")
-    print(f"DEBUG: Container port = {container_port}")
-    print(f"DEBUG: Container username = {mariadb_container.username}")
-    print(f"DEBUG: Container password = {mariadb_container.password}")
-    print(f"DEBUG: Container database = {mariadb_container.dbname}")
-
-    # Override environment variables for TonyDBC with actual container details
-    container_env = {
-        "MYSQL_HOST": container_host,
-        "MYSQL_PORT": str(container_port),
-        "MYSQL_READWRITE_USER": mariadb_container.username,
-        "MYSQL_READWRITE_PASSWORD": mariadb_container.password,
-        "MYSQL_DATABASE": mariadb_container.dbname,
-        "MYSQL_TEST_DATABASE": mariadb_container.dbname,
-        "DEFAULT_TIMEZONE": "UTC",
-        "CHECK_ENVIRONMENT_INTEGRITY": "False",
-        "USE_PRODUCTION_DATABASE": "False",
-    }
-
-    # Store original values to restore later
-    original_env = {}
-    for key, value in container_env.items():
-        original_env[key] = os.environ.get(key)
-        os.environ[key] = value
-
-    try:
-        # FIRST: Test raw MariaDB connection to make sure container is accessible
-        print("Testing raw MariaDB connection first...")
-        test_conn = mariadb.connect(
-            host=container_host,
-            port=int(container_port),
-            user=mariadb_container.username,
-            password=mariadb_container.password,
-            database=mariadb_container.dbname,
-        )
-        print("✅ Raw MariaDB connection successful!")
-        test_conn.close()
-
-        # SECOND: Create TonyDBC instance with container connection details
-        print("Creating TonyDBC instance...")
-        db_instance = tonydbc.TonyDBC(
-            host=container_host,
-            port=int(container_port),
-            user=mariadb_container.username,
-            password=mariadb_container.password,
-            database=mariadb_container.dbname,
-            autocommit=True,
-        )
-        print("✅ TonyDBC instance created successfully!")
-        yield db_instance
-    finally:
-        # Restore original environment variables
-        for key, original_value in original_env.items():
-            if original_value is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = original_value
-
-
-@pytest.fixture(scope="session")
-def setup_tables(
-    mariadb_container: Any, tonydbc_instance: Any
+@pytest.fixture(scope="function")
+def setup_tables(tonydbc_instance: Any
 ) -> Generator[Any, None, None]:
     """Set up the required tables for testing"""
-
-    # Get the actual container connection details
-    actual_host = mariadb_container.get_container_host_ip()
-    actual_port = mariadb_container.get_exposed_port(3306)
-
-    print("Creating temp connection to database")
-    print(f"Container host: {actual_host}")
-    print(f"Container port: {actual_port}")
-    print(f"TonyDBC instance host: {tonydbc_instance.host}")
-    print(f"TonyDBC instance port: {getattr(tonydbc_instance, 'port', 'NO_PORT_ATTR')}")
-
-    temp_conn = mariadb.connect(
-        host=actual_host,
-        port=int(actual_port),
-        user=mariadb_container.username,
-        password=mariadb_container.password,
-        database=mariadb_container.dbname,
-        client_flag=MULTI_STATEMENTS,
-        autocommit=False,
-        read_timeout=3600,
-        write_timeout=3600,
-        local_infile=True,
-        compress=True,
-    )
-    print("Connection worked!")
-    with temp_conn.cursor() as cursor:
-        cursor.execute("SELECT 1")
-        result = cursor.fetchone()
-        print(f"Result: {result}")
-        cursor.execute("SHOW TABLES;")
-        tables = cursor.fetchall()
-        print(f"Tables: {tables}")
-    temp_conn.close()
-    print("Connection closed!")
 
     with tonydbc_instance as db:
         print("tonydbc instance entered successfully")
@@ -281,7 +115,7 @@ def setup_tables(
         sortie_count = db.get_data("SELECT COUNT(*) as count FROM sortie")[0]["count"]
         machine_count = db.get_data("SELECT COUNT(*) as count FROM machine")[0]["count"]
 
-        print(f"✅ Setup complete: {sortie_count} sorties, {machine_count} machines")
+        print(f"Setup complete: {sortie_count} sorties, {machine_count} machines")
 
         yield db
 
@@ -356,7 +190,7 @@ def test_database_setup(setup_tables: Any) -> None:
         assert machines[0]["name"] == "Test Machine 1"
         assert machines[0]["hostname"] == "testmachine1.local"
 
-        print("✅ Database verification passed:")
+        print("SUCCESS Database verification passed:")
         print(f"   - Tables: {table_names}")
         print(f"   - Sorties: {len(sorties)}")
         print(f"   - Machines: {len(machines)}")
@@ -384,7 +218,7 @@ def test_dataframe_creation() -> None:
     # Verify unique constraints won't be violated
     assert df["video_sequence"].nunique() == len(df), "Duplicate video_sequence values"
 
-    print("✅ DataFrame creation test passed:")
+    print("SUCCESS DataFrame creation test passed:")
     print(f"   - Shape: {df.shape}")
     print(f"   - Timestamp dtype: {df['file_created_at'].dtype}")
     print(f"   - Sample timestamp: {df['file_created_at'].iloc[0]}")
@@ -408,7 +242,7 @@ def test_timestamp_data_insertion(setup_tables: Any) -> None:
         # Test data insertion with pandas timestamps
         result_df = db.append_to_table("video", videos_df, return_reindexed=True)
 
-        print("✅ SUCCESS: Data inserted successfully!")
+        print("SUCCESS SUCCESS: Data inserted successfully!")
         print(f"   Inserted {len(result_df)} rows with IDs: {result_df.index.tolist()}")
 
         # Verify the data was inserted correctly and check data quality
@@ -438,7 +272,7 @@ def test_timestamp_data_insertion(setup_tables: Any) -> None:
                 "event_log_id should be NULL for test data"
             )
 
-        print("✅ All data quality checks passed!")
+        print("SUCCESS All data quality checks passed!")
 
 
 def test_timestamp_workarounds(setup_tables: Any) -> None:
@@ -463,7 +297,7 @@ def test_timestamp_workarounds(setup_tables: Any) -> None:
 
         try:
             result1 = db.append_to_table("video", df_str, return_reindexed=True)
-            print(f"✅ String conversion: SUCCESS - {len(result1)} rows inserted")
+            print(f"SUCCESS String conversion: SUCCESS - {len(result1)} rows inserted")
 
             # Verify data
             videos = db.get_data(
@@ -477,7 +311,7 @@ def test_timestamp_workarounds(setup_tables: Any) -> None:
             strategies.append(("string", True, None))
 
         except Exception as e:
-            print(f"❌ String conversion: FAILED - {e}")
+            print(f"FAILED String conversion: FAILED - {e}")
             strategies.append(("string", False, str(e)))
 
         # Strategy 2: Convert to Unix timestamp (int)
@@ -488,7 +322,7 @@ def test_timestamp_workarounds(setup_tables: Any) -> None:
 
         try:
             result2 = db.append_to_table("video", df_unix, return_reindexed=True)
-            print(f"✅ Unix timestamp: SUCCESS - {len(result2)} rows inserted")
+            print(f"SUCCESS Unix timestamp: SUCCESS - {len(result2)} rows inserted")
 
             # Verify data
             videos = db.get_data(
@@ -502,7 +336,7 @@ def test_timestamp_workarounds(setup_tables: Any) -> None:
             strategies.append(("unix", True, None))
 
         except Exception as e:
-            print(f"❌ Unix timestamp: FAILED - {e}")
+            print(f"FAILED Unix timestamp: FAILED - {e}")
             strategies.append(("unix", False, str(e)))
 
         # Strategy 3: Use Python datetime objects
@@ -515,7 +349,7 @@ def test_timestamp_workarounds(setup_tables: Any) -> None:
 
         try:
             result3 = db.append_to_table("video", df_dt, return_reindexed=True)
-            print(f"✅ Datetime objects: SUCCESS - {len(result3)} rows inserted")
+            print(f"SUCCESS Datetime objects: SUCCESS - {len(result3)} rows inserted")
 
             # Verify data
             videos = db.get_data(
@@ -529,7 +363,7 @@ def test_timestamp_workarounds(setup_tables: Any) -> None:
             strategies.append(("datetime", True, None))
 
         except Exception as e:
-            print(f"❌ Datetime objects: FAILED - {e}")
+            print(f"FAILED Datetime objects: FAILED - {e}")
             strategies.append(("datetime", False, str(e)))
 
         # Strategy 4: Use None (NULL)
@@ -540,7 +374,7 @@ def test_timestamp_workarounds(setup_tables: Any) -> None:
 
         try:
             result4 = db.append_to_table("video", df_null, return_reindexed=True)
-            print(f"✅ NULL values: SUCCESS - {len(result4)} rows inserted")
+            print(f"SUCCESS NULL values: SUCCESS - {len(result4)} rows inserted")
 
             # Verify data
             videos = db.get_data(
@@ -554,7 +388,7 @@ def test_timestamp_workarounds(setup_tables: Any) -> None:
             strategies.append(("null", True, None))
 
         except Exception as e:
-            print(f"❌ NULL values: FAILED - {e}")
+            print(f"FAILED NULL values: FAILED - {e}")
             strategies.append(("null", False, str(e)))
 
         # Summary
@@ -562,11 +396,11 @@ def test_timestamp_workarounds(setup_tables: Any) -> None:
         successful_strategies = [s for s in strategies if s[1]]
         failed_strategies = [s for s in strategies if not s[1]]
 
-        print(f"✅ Successful strategies: {len(successful_strategies)}")
+        print(f"SUCCESS Successful strategies: {len(successful_strategies)}")
         for name, _, _ in successful_strategies:
             print(f"   - {name}")
 
-        print(f"❌ Failed strategies: {len(failed_strategies)}")
+        print(f"FAILED Failed strategies: {len(failed_strategies)}")
         for name, _, error in failed_strategies:
             print(f"   - {name}: {error}")
 
@@ -644,7 +478,7 @@ def test_column_type_inspection(setup_tables: Any) -> None:
                         or (expected_type is float and "float" in str(actual_dtype))
                         or (expected_type is bool and "bool" in str(actual_dtype))
                     )
-                match_symbol = "✅" if is_compatible else "❌"
+                match_symbol = "SUCCESS" if is_compatible else "FAILED"
 
                 print(
                     f"{col:<25} | {expected_type_name:<15} | {str(actual_dtype):<20} | {match_symbol}"
