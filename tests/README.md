@@ -1,111 +1,96 @@
 # TonyDBC Tests
 
-This directory contains comprehensive tests for TonyDBC, specifically focused on reproducing and fixing timestamp-related issues with MariaDB Connector/Python.
+This directory contains comprehensive tests for TonyDBC using **fresh, isolated MariaDB containers** to ensure tests never interfere with production databases.
 
-## The Issue
+## Test Architecture
 
-When using `append_to_table()` with DataFrames containing pandas Timestamp columns, you may encounter:
+All tests use **disposable Docker containers** managed by `conftest.py`:
+- Each test session gets a fresh MariaDB container on `localhost:5000`
+- Database is completely isolated and destroyed after tests
+- No risk of connecting to production databases
+- No manual cleanup required
 
-```
-mariadb.NotSupportedError: Data type 'Timestamp' in column X not supported in MariaDB Connector/Python
-```
+## Prerequisites
 
-## Test Setup
+- **Docker** (for MariaDB containers)
+- **Python 3.10+**
 
-### 1. Prerequisites
-
-- Docker (for testcontainers)
-- Python 3.9+
-
-### 2. Install Test Dependencies
+## Install Test Dependencies
 
 ```bash
 pip install -r tests/requirements.txt
 ```
 
-### 3. Running Tests
+## Running Tests
 
-**No manual database setup required!** The tests use testcontainers to automatically:
-- Spin up a MariaDB container
-- Create test database and tables  
-- Run all tests
-- Clean up automatically
+**Zero setup required!** Just run pytest:
 
 ```bash
-# From the project root
-python tests/run_tests.py
+# Run all tests
+pytest
 
-# Or use pytest directly
-pytest tests/test_timestamp_issue.py -v -s
+# Run with verbose output
+pytest -v -s
 
-# Or if you need code.interact
-pytest -s -v -x
+# Run specific test files
+pytest tests/test_fresh_database.py -v
+pytest tests/test_timestamp_issue.py -v
+pytest tests/test_tonydbc_integration.py -v
+
+# Test Docker availability first
+pytest tests/test_docker_availability.py -v
 ```
 
-## What the Tests Do
+## Test Categories
 
-### 🏗️ `test_database_setup()`
-- Verifies that MariaDB container is running
-- Confirms all tables are created correctly
-- Validates foreign key data exists
-- **Ensures we have a solid foundation for testing**
+### 🐳 **Docker Availability Tests** (`test_docker_availability.py`)
+- Verifies Docker is running and accessible
+- Checks MariaDB image availability
+- Tests Docker API functionality
+- **Run this first if you have Docker issues**
 
-### 📊 `test_dataframe_creation()`
-- Creates realistic video DataFrames with timestamp columns
-- Validates DataFrame structure and types
-- Confirms foreign key relationships are valid
-- **Ensures our test data is correct**
+### 🗄️ **Fresh Database Tests** (`test_fresh_database.py`)
+- Tests basic TonyDBC operations with fresh containers
+- Validates database connections and queries
+- Tests audit logging controls (disabled mode)
+- **Demonstrates the fresh database approach**
 
-### 🔍 `test_timestamp_issue_reproduction()`
-- Creates DataFrames with pandas Timestamp columns
-- Attempts `db.append_to_table("video", videos_df)`
-- **Should reproduce the original error**
-- Provides detailed error analysis
+### 🔗 **Integration Tests** (`test_tonydbc_integration.py`)
+- Comprehensive TonyDBC functionality testing
+- Tests table operations, primary keys, data types
+- Real database operations with fresh containers
+- **Full integration testing suite**
 
-### 🔧 `test_timestamp_workarounds()`
-- Tests 4 different strategies for handling timestamps:
-  1. **String conversion**: `dt.strftime('%Y-%m-%d %H:%M:%S')`
-  2. **Unix timestamps**: Convert to integer seconds
-  3. **Python datetime**: Convert to native datetime objects  
-  4. **NULL values**: Test with None/NULL
-- **Verifies which strategies work and which fail**
-- Shows actual inserted data for successful strategies
+### ⏰ **Timestamp Issue Tests** (`test_timestamp_issue.py`)
+- Reproduces pandas Timestamp issues with MariaDB
+- Tests various timestamp handling strategies
+- Validates DataFrame operations with timestamp columns
+- **Specific to timestamp/datetime handling bugs**
 
-### 🔍 `test_column_type_inspection()`
-- Detailed analysis of DataFrame column types vs. MariaDB expectations
-- Shows pandas dtypes vs. TonyDBC expected types
-- **Special focus on timestamp column analysis**
-- Helps debug type mismatches
+### 🔍 **Audit Path Tests** (`test_audit_path.py`)
+- Tests TonyDBC audit logging functionality
+- Currently skipped due to TonyDBC initialization bug
+- Tests audit disabled and force_no_audit modes
+- **Audit logging feature testing**
 
-## Expected Results
+### 🧪 **Unit Tests** (`test_tonydbc_unit.py`)
+- Mock-based unit tests for TonyDBC methods
+- No real database connections (uses mocks)
+- Comprehensive method coverage
+- **Fast unit testing without containers**
 
-1. **Database setup should pass** ✅
-2. **DataFrame creation should pass** ✅  
-3. **Timestamp reproduction should fail** ❌ (this demonstrates the bug)
-4. **Some workarounds should succeed** ✅ (shows solutions)
-5. **Type inspection shows the mismatch** 🔍 (explains why it fails)
+## Key Features
 
-## Database Schema
+✅ **Production-Safe**: Impossible to connect to production databases  
+✅ **Isolated**: Each test session gets a fresh MariaDB container  
+✅ **Automatic**: No manual setup or cleanup required  
+✅ **Fast**: Shared container per test session  
+✅ **Comprehensive**: Tests all major TonyDBC functionality  
 
-The tests use this video table schema (matching your production schema):
+## No Manual Cleanup Needed
 
-```sql
-CREATE TABLE `video` (
-  `id` BIGINT(20) NOT NULL AUTO_INCREMENT,
-  `sortie_id` BIGINT(20) NOT NULL,
-  `file_created_at` TIMESTAMP DEFAULT NULL,  -- This is the problematic column
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  -- ... other columns
-  PRIMARY KEY (`id`)
-);
-```
-
-## Cleanup
-
-The tests automatically create and clean up a test database (`test_tonydbc_timestamps`).
-If cleanup fails, you can manually drop it:
-
-```sql
-DROP DATABASE IF EXISTS test_tonydbc_timestamps;
-```
+Unlike traditional database tests, these use **disposable Docker containers**:
+- Container is automatically destroyed after tests
+- No leftover databases or test data
+- No manual `DROP DATABASE` commands needed
+- Fresh state for every test run
