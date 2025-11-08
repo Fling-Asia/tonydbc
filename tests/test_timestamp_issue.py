@@ -24,9 +24,17 @@ import tonydbc
 
 # Legacy fixture for backward compatibility
 @pytest.fixture(scope="function")
-def tonydbc_instance(fresh_tonydbc_instance):
-    """Legacy alias for fresh_tonydbc_instance"""
-    return fresh_tonydbc_instance
+def tonydbc_instance(fresh_mariadb_container, safe_test_env):
+    """Legacy alias that creates a fresh TonyDBC instance"""
+    # Create a fresh TonyDBC instance for each test function
+    container_info = fresh_mariadb_container
+    return tonydbc.TonyDBC(
+        host=container_info["host"],
+        port=container_info["port"],
+        user=container_info["user"],
+        password=container_info["password"],
+        database=container_info["database"]
+    )
 
 
 @pytest.fixture(scope="function")
