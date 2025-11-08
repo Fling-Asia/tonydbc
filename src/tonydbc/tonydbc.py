@@ -93,8 +93,8 @@ MAX_RECONNECTION_ATTEMPTS = 3
 
 def get_currentframe_method() -> str:
     cur_frame = inspect.currentframe()
-    if cur_frame and hasattr(cur_frame, "f_code"):
-        return cur_frame.f_code.co_name
+    if cur_frame and cur_frame.f_back and hasattr(cur_frame.f_back, "f_code"):
+        return cur_frame.f_back.f_code.co_name
     else:
         return "unknown"
 
@@ -239,6 +239,7 @@ class _TonyDBCOnlineOnly:
             # Create a separate _TonyDBCOnlineOnly instance for audit operations
             self._audit_db = _TonyDBCOnlineOnly(
                 host=self.host,
+                port=self.port,
                 user=self.user,
                 password=self.password,
                 database=self.database,
@@ -1478,7 +1479,9 @@ class _TonyDBCOnlineOnly:
 
         # Use separate audit connection to avoid interfering with last_insert_id
         # Use the audit connection's append_to_table method
-        assert self._audit_db is not None
+        if self._audit_db is None:
+            # Audit connection not yet initialized during setup - skip audit logging
+            return
         self._audit_db.append_to_table("tony", df, no_tracking=True)
 
         # If we aren't just tracking exclusively in the database,
