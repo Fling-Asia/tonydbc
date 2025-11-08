@@ -9,8 +9,8 @@ import os
 import subprocess
 import time
 from pathlib import Path
-from typing import Any, Generator
 from types import SimpleNamespace
+from typing import Any
 
 import mariadb  # type: ignore
 import pytest
@@ -20,7 +20,7 @@ def _wait_for_database(host: str, port: int, user: str, password: str, database:
     """Wait for database to be ready with shorter timeout"""
     start_time = time.time()
     last_err = None
-    
+
     while time.time() - start_time < timeout:
         try:
             conn = mariadb.connect(
@@ -40,26 +40,26 @@ def _wait_for_database(host: str, port: int, user: str, password: str, database:
             last_err = e
             print(f"Waiting for database... ({e})")
             time.sleep(1)  # Shorter sleep
-    
+
     raise TimeoutError(f"Database not ready after {timeout} seconds; last error: {last_err}")
 
 
 def _start_mariadb_container() -> dict[str, Any]:
     """Start the MariaDB container and return connection details"""
     container_name = "tonydbc-test-db"
-    
+
     # Stop and remove existing container if it exists
     try:
         print(f"Cleaning up any existing container: {container_name}")
-        subprocess.run(["docker", "stop", container_name], 
+        subprocess.run(["docker", "stop", container_name],
                       capture_output=True, check=False, timeout=10)
-        subprocess.run(["docker", "rm", container_name], 
+        subprocess.run(["docker", "rm", container_name],
                       capture_output=True, check=False, timeout=10)
     except subprocess.TimeoutExpired:
         print("Warning: Container cleanup timed out")
     except Exception as e:
         print(f"Container cleanup warning: {e}")
-    
+
     # Start new container with resource limits
     docker_cmd = [
         "docker", "run", "-d", "--name", container_name,
@@ -72,19 +72,19 @@ def _start_mariadb_container() -> dict[str, Any]:
         "-e", "MYSQL_PASSWORD=test",
         "mariadb:10.6"
     ]
-    
+
     print(f"Starting MariaDB container: {' '.join(docker_cmd)}")
     try:
         result = subprocess.run(docker_cmd, capture_output=True, text=True, timeout=30)
     except subprocess.TimeoutExpired:
         raise RuntimeError("Container startup timed out after 30 seconds")
-    
+
     if result.returncode != 0:
         raise RuntimeError(f"Failed to start container: {result.stderr}")
-    
+
     container_id = result.stdout.strip()
     print(f"Container started with ID: {container_id}")
-    
+
     return {
         "container_name": container_name,
         "container_id": container_id,
@@ -100,18 +100,18 @@ def _stop_mariadb_container(container_name: str) -> None:
     """Stop and remove the MariaDB container with timeout"""
     try:
         print(f"Stopping container: {container_name}")
-        subprocess.run(["docker", "stop", container_name], 
+        subprocess.run(["docker", "stop", container_name],
                       capture_output=True, check=True, timeout=15)
-        subprocess.run(["docker", "rm", container_name], 
+        subprocess.run(["docker", "rm", container_name],
                       capture_output=True, check=True, timeout=10)
         print(f"Container {container_name} stopped and removed")
     except subprocess.TimeoutExpired:
         print(f"Warning: Container {container_name} cleanup timed out")
         # Force kill if stop times out
         try:
-            subprocess.run(["docker", "kill", container_name], 
+            subprocess.run(["docker", "kill", container_name],
                           capture_output=True, check=False, timeout=5)
-            subprocess.run(["docker", "rm", "-f", container_name], 
+            subprocess.run(["docker", "rm", "-f", container_name],
                           capture_output=True, check=False, timeout=5)
             print(f"Container {container_name} force removed")
         except Exception as e:
@@ -126,14 +126,14 @@ def _stop_mariadb_container(container_name: str) -> None:
 def fresh_mariadb_container():
     """
     Create a fresh MariaDB container for all tests in the session.
-    
+
     This fixture ensures that all tests use a clean, isolated database
     instead of potentially connecting to production databases via MYSQL_HOST.
     """
     # Create container once per session
     print("Creating new MariaDB container for test session...")
     container_info = _start_mariadb_container()
-    
+
     # Wait for database to be ready
     _wait_for_database(
         host=container_info["host"],
@@ -143,12 +143,12 @@ def fresh_mariadb_container():
         database=container_info["database"],
         timeout=60
     )
-    
+
     # Store container info globally for cleanup
     fresh_mariadb_container._container_info = container_info
-    
+
     yield container_info
-    
+
     # Container cleanup happens in pytest_sessionfinish hook
 
 
@@ -156,14 +156,14 @@ def fresh_mariadb_container():
 def fresh_database_per_module(fresh_mariadb_container):
     """
     Drop and recreate the database for each test module to ensure clean state.
-    
+
     This prevents tests from different modules from interfering with each other
     by ensuring each module starts with a completely fresh database.
     """
     container_info = fresh_mariadb_container
-    
-    print(f"\nDropping and recreating database for test module...")
-    
+
+    print("\nDropping and recreating database for test module...")
+
     # Connect as root to drop/create database
     try:
         import mariadb
@@ -176,7 +176,7 @@ def fresh_database_per_module(fresh_mariadb_container):
             read_timeout=10,
             write_timeout=10
         )
-        
+
         with root_conn.cursor() as cursor:
             # Drop the database completely
             cursor.execute(f"DROP DATABASE IF EXISTS {container_info['database']}")
@@ -185,13 +185,13 @@ def fresh_database_per_module(fresh_mariadb_container):
             # Grant permissions to test user
             cursor.execute(f"GRANT ALL PRIVILEGES ON {container_info['database']}.* TO '{container_info['user']}'@'%'")
             cursor.execute("FLUSH PRIVILEGES")
-        
+
         root_conn.close()
         print(f"Database {container_info['database']} recreated successfully")
-        
+
     except Exception as e:
         print(f"Warning: Could not recreate database: {e}")
-    
+
     yield container_info
 
 
@@ -199,16 +199,16 @@ def fresh_database_per_module(fresh_mariadb_container):
 def safe_test_env(fresh_database_per_module):
     """
     Set up safe test environment variables that point to the fresh database.
-    
+
     This fixture overrides potentially dangerous environment variables like
     MYSQL_HOST to ensure tests never accidentally connect to production.
     """
     container_info = fresh_database_per_module
-    
+
     # Safe test environment that points to our fresh container
     safe_env = {
         "USE_PRODUCTION_DATABASE": "False",
-        "CHECK_ENVIRONMENT_INTEGRITY": "False", 
+        "CHECK_ENVIRONMENT_INTEGRITY": "False",
         "INTERACT_AFTER_ERROR": "False",
         "DEFAULT_TIMEZONE": "UTC",
         "AUDIT_PATH": "",  # Disable audit to avoid TonyDBC bug
@@ -220,17 +220,17 @@ def safe_test_env(fresh_database_per_module):
         "MYSQL_PRODUCTION_DATABASE": container_info["database"],  # Safe fallback
         "MYSQL_TEST_DATABASE": container_info["database"],
     }
-    
+
     # Store original environment
     original_env = {}
     for key, value in safe_env.items():
         original_env[key] = os.environ.get(key)
         os.environ[key] = value
-    
+
     print(f"Set safe test environment pointing to fresh database at {container_info['host']}:{container_info['port']}")
-    
+
     yield container_info
-    
+
     # Restore original environment
     for key, value in original_env.items():
         if value is None:
@@ -243,7 +243,7 @@ def safe_test_env(fresh_database_per_module):
 def fresh_tonydbc_instance(fresh_database_per_module, safe_test_env):
     """
     Create a TonyDBC instance connected to the fresh test database.
-    
+
     This fixture provides a ready-to-use TonyDBC instance that is guaranteed
     to be connected to the fresh test database, not production.
     """
@@ -251,9 +251,9 @@ def fresh_tonydbc_instance(fresh_database_per_module, safe_test_env):
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
     import tonydbc
-    
+
     container_info = safe_test_env
-    
+
     db = tonydbc.TonyDBC(
         host=container_info["host"],
         port=container_info["port"],
@@ -262,7 +262,7 @@ def fresh_tonydbc_instance(fresh_database_per_module, safe_test_env):
         database=container_info["database"],
         force_no_audit=True  # Disable audit by default to avoid the initialization bug
     )
-    
+
     return db
 
 
@@ -291,7 +291,7 @@ def mariadb_container(fresh_database_per_module):
     )
 
 
-@pytest.fixture(scope="session") 
+@pytest.fixture(scope="session")
 def tonydbc_instance(fresh_tonydbc_instance):
     """Legacy alias for fresh_tonydbc_instance"""
     return fresh_tonydbc_instance

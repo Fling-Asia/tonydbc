@@ -5,9 +5,7 @@ This test uses fresh MariaDB database containers from conftest.py to test
 inserting data with TIMESTAMP columns, ensuring tests never connect to production.
 """
 
-import os
 import sys
-import time
 from pathlib import Path
 from typing import Any, Generator
 
@@ -18,7 +16,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import tonydbc
-
 
 # Container setup and fixtures are now provided by conftest.py
 

@@ -5,8 +5,8 @@ This test verifies that Docker is available and running before other tests
 that depend on Docker containers are executed.
 """
 
-import pytest
 import docker
+import pytest
 
 
 class TestDockerAvailability:

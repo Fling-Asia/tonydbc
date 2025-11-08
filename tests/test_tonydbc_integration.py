@@ -6,9 +6,7 @@ to test TonyDBC functionality with actual database interactions,
 ensuring tests never connect to production databases.
 """
 
-import os
 import sys
-import time
 from pathlib import Path
 
 import pandas as pd
@@ -17,7 +15,6 @@ import pytest
 # Add the src directory to the path so we can import tonydbc
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-import tonydbc
 
 
 # Container setup and fixtures are now provided by conftest.py
@@ -59,7 +56,7 @@ def setup_tables(fresh_tonydbc_instance):
         db.execute("SET FOREIGN_KEY_CHECKS = 0")  # Temporarily disable FK checks
         db.execute("DROP TABLE IF EXISTS posts")  # From fresh_database tests
         db.execute("DROP TABLE IF EXISTS test_table")
-        db.execute("DROP TABLE IF EXISTS no_pk_table") 
+        db.execute("DROP TABLE IF EXISTS no_pk_table")
         db.execute("DROP TABLE IF EXISTS users")
         db.execute("SET FOREIGN_KEY_CHECKS = 1")  # Re-enable FK checks
 
@@ -260,7 +257,7 @@ class TestTonyDBCIntegration:
     def test_sortie_append_with_timestamps(self, fresh_tonydbc_instance):
         """Create `sortie` table and append a tz-aware dataframe without errors."""
         with fresh_tonydbc_instance as db:
-            
+
             # Create referenced tables for foreign keys
             db.execute(
                 """

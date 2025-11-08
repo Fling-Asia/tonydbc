@@ -844,14 +844,13 @@ class TestTonyDBCOnlineOnly:
 
         assert "id" in result
 
-    @pytest.mark.skip(reason="Temporarily disabled - needs real DB container")
     def test_column_datatypes_property(self, tonydbc_instance):
         """Test column_datatypes property returns datatype dict"""
         db, mock_conn, mock_cursor = tonydbc_instance
 
-        with patch.object(db, "refresh_column_datatypes"):
-            db._column_datatypes = {"table1": {"id": int}}
-            result = db.column_datatypes
+        # Set the cached datatypes directly
+        db._column_datatypes = {"table1": {"id": int}}
+        result = db.column_datatypes
 
         assert result == {"table1": {"id": int}}
 
@@ -883,7 +882,6 @@ class TestTonyDBCOnlineOnly:
         assert result["database"] == db.database
         assert result["port"] == db.port
 
-    @pytest.mark.skip(reason="Temporarily disabled - needs real DB container")
     def test_insert_row_all_string(self, tonydbc_instance):
         """Test insert_row_all_string inserts row with string values"""
         db, mock_conn, mock_cursor = tonydbc_instance
@@ -893,22 +891,30 @@ class TestTonyDBCOnlineOnly:
             db.insert_row_all_string("test_table", row_data)
 
         mock_execute.assert_called_once()
-        query = mock_execute.call_args[0][0]
+        # Check if called with positional or keyword arguments
+        call_args = mock_execute.call_args
+        if call_args[0]:  # positional arguments
+            query = call_args[0][0]
+        else:  # keyword arguments
+            query = call_args[1].get('command', '')
         assert "INSERT INTO test_table" in query
 
-    @pytest.mark.skip(reason="Temporarily disabled - needs real DB container")
     def test_temp_id_table(self, tonydbc_instance):
         """Test temp_id_table creates temporary table with IDs"""
         db, mock_conn, mock_cursor = tonydbc_instance
         id_list = [1, 2, 3]
 
-        with patch.object(db, "execute") as mock_execute:
+        with (
+            patch.object(db, "execute") as mock_execute,
+            patch.object(db, "append_to_table") as mock_append,
+        ):
             context_manager = db.temp_id_table(id_list)
             with context_manager as temp_table_name:
-                assert temp_table_name.startswith("temp_ids_")
+                assert temp_table_name.startswith("temp_loc_ids_")
 
         # Verify table creation and cleanup
         assert mock_execute.call_count >= 2  # CREATE and DROP
+        mock_append.assert_called_once()  # Data insertion
 
     @pytest.mark.skip(reason="Replaced by integration test with real table")
     def test_append_to_table_basic(self, tonydbc_instance):
@@ -926,22 +932,28 @@ class TestTonyDBCOnlineOnly:
         """Test query_table with custom SQL query"""
         pytest.skip("Covered by integration test using explicit SQL on real table")
 
-    @pytest.mark.skip(reason="Temporarily disabled - needs real DB container")
     def test_refresh_table(self, tonydbc_instance):
         """Test refresh_table loads entire table"""
         db, mock_conn, mock_cursor = tonydbc_instance
         mock_df = pd.DataFrame({"id": [1, 2, 3]})
 
         with patch.object(db, "query_table", return_value=mock_df):
-            result = db.refresh_table("test_table")
+            db.refresh_table("test_table")
 
-        assert isinstance(result, pd.DataFrame)
+        # Check that the table was set as an attribute
+        assert hasattr(db, "test_table_df")
+        assert isinstance(getattr(db, "test_table_df"), pd.DataFrame)
 
-    @pytest.mark.skip(reason="Temporarily disabled - needs real DB container")
     def test_log_to_db(self, tonydbc_instance):
         """Test log_to_db saves log entry to database"""
         db, mock_conn, mock_cursor = tonydbc_instance
-        log_data = {"level": "INFO", "message": "test log"}
+        log_data = {
+            "log_module": "test_module",
+            "log_state": "INFO",
+            "log_event": "test_event",
+            "log_message": "test log",
+            "log_hostname": "test_host"
+        }
 
         with patch.object(db, "execute") as mock_execute:
             db.log_to_db(log_data)
@@ -1038,7 +1050,6 @@ class TestTonyDBC:
             db._mariatonydbcn = mock_conn
             yield db, mock_conn, mock_cursor
 
-    @pytest.mark.skip(reason="Temporarily disabled - needs real DB container")
     def test_init_sets_media_base_path(self, mock_connection):
         """Test TonyDBC __init__ sets media base path from environment"""
         mock_conn, mock_cursor = mock_connection
@@ -1051,7 +1062,8 @@ class TestTonyDBC:
                 host="localhost", user="test", password="test", database="test"
             )
 
-        assert db.media_base_path == "/custom/path"
+        # Check that the pickle path uses the custom media base path
+        assert "/custom/path" in db._TonyDBC__offline_pickle_path
 
     def test_is_online_property_getter(self, tonydbc_instance):
         """Test is_online property getter"""

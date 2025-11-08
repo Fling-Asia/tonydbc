@@ -7,18 +7,12 @@ that TonyDBC can connect and perform basic operations against a fresh database.
 
 import os
 import sys
-import tempfile
 from pathlib import Path
-from typing import Any
 from unittest.mock import patch
-
-import pandas as pd
-import pytest
 
 # Add the src directory to the path so we can import tonydbc
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-import tonydbc
 
 
 class TestFreshDatabase:
@@ -32,7 +26,7 @@ class TestFreshDatabase:
             assert len(result) == 1
             assert result[0]["test_value"] == 1
             print("Basic query test passed")
-            
+
             # Test table creation and data insertion
             connection.execute("""
                 CREATE TABLE IF NOT EXISTS test_table (
@@ -41,22 +35,22 @@ class TestFreshDatabase:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            
+
             connection.execute("""
                 INSERT INTO test_table (name) VALUES ('test_record')
             """)
-            
+
             # Test data retrieval
             result = connection.get_data("SELECT * FROM test_table WHERE name = 'test_record'")
             assert len(result) == 1
             assert result[0]["name"] == 'test_record'
             print("Table creation and data insertion test passed")
-            
+
             # Verify we're connected to the correct database
             db_name = connection.get_data("SELECT DATABASE() as db_name")
             assert db_name[0]["db_name"] == "test_fresh_db"
             print(f"Connected to correct database: {db_name[0]['db_name']}")
-            
+
             print("All fresh database tests passed!")
 
     def test_fresh_database_audit_logging_disabled(self, fresh_tonydbc_instance):
@@ -66,7 +60,7 @@ class TestFreshDatabase:
             result = connection.get_data("SELECT 'audit_disabled' as test")
             assert result[0]["test"] == 'audit_disabled'
             print("Audit disabled test passed")
-        
+
         # Test with FORCE_NO_AUDIT = True
         with patch.dict(os.environ, {"FORCE_NO_AUDIT": "True"}):
             with fresh_tonydbc_instance as connection:
@@ -74,7 +68,7 @@ class TestFreshDatabase:
                 result = connection.get_data("SELECT 'force_no_audit' as test")
                 assert result[0]["test"] == 'force_no_audit'
                 print("Force no audit test passed")
-        
+
         print("All audit control tests passed!")
 
     def test_fresh_database_multiple_operations(self, fresh_tonydbc_instance):
@@ -88,7 +82,7 @@ class TestFreshDatabase:
                     email VARCHAR(100)
                 )
             """)
-            
+
             connection.execute("""
                 CREATE TABLE IF NOT EXISTS posts (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -98,37 +92,37 @@ class TestFreshDatabase:
                     FOREIGN KEY (user_id) REFERENCES users(id)
                 )
             """)
-            
+
             # Insert test data
             connection.execute("""
-                INSERT INTO users (username, email) VALUES 
+                INSERT INTO users (username, email) VALUES
                 ('testuser1', 'test1@example.com'),
                 ('testuser2', 'test2@example.com')
             """)
-            
+
             # Get user IDs
             users = connection.get_data("SELECT id, username FROM users ORDER BY id")
             assert len(users) == 2
-            
+
             user1_id, user2_id = users[0]["id"], users[1]["id"]
-            
+
             # Insert posts
             connection.execute(f"""
-                INSERT INTO posts (user_id, title, content) VALUES 
+                INSERT INTO posts (user_id, title, content) VALUES
                 ({user1_id}, 'First Post', 'This is the first post'),
                 ({user2_id}, 'Second Post', 'This is the second post')
             """)
-            
+
             # Test JOIN query
             posts_with_users = connection.get_data("""
-                SELECT u.username, p.title, p.content 
-                FROM users u 
-                JOIN posts p ON u.id = p.user_id 
+                SELECT u.username, p.title, p.content
+                FROM users u
+                JOIN posts p ON u.id = p.user_id
                 ORDER BY u.id
             """)
-            
+
             assert len(posts_with_users) == 2
             assert posts_with_users[0]["username"] == 'testuser1'
             assert posts_with_users[1]["username"] == 'testuser2'
-            
+
             print("Multiple database operations test passed")

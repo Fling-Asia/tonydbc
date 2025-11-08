@@ -15,12 +15,9 @@ to ensure they never connect to production databases.
 
 import os
 import sys
-import tempfile
-import time
 from pathlib import Path
 from unittest.mock import patch
 
-import pandas as pd
 import pytest
 
 # Add the src directory to the path so we can import tonydbc
@@ -63,15 +60,15 @@ class TestAuditPath:
                 password=safe_test_env["password"],
                 database=safe_test_env["database"],
             )
-            
+
             with audit_db:
                 # Verify audit is disabled
                 assert audit_db.do_audit is False
                 assert not hasattr(audit_db, 'ipath')
-                
+
                 # Execute a test query
                 result = audit_db.get_data("SELECT 3 as test_column")
-                
+
                 # Verify the query executed correctly
                 assert len(result) == 1
                 assert result[0]["test_column"] == 3
@@ -89,7 +86,7 @@ class TestAuditPath:
                 database=safe_test_env["database"],
                 force_no_audit=True
             )
-            
+
             with db:
                 # Verify audit is disabled despite AUDIT_PATH being set
                 assert db.do_audit is False
