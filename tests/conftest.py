@@ -152,15 +152,58 @@ def fresh_mariadb_container():
     # Container cleanup happens in pytest_sessionfinish hook
 
 
-@pytest.fixture(scope="session")
-def safe_test_env(fresh_mariadb_container):
+@pytest.fixture(scope="module")
+def fresh_database_per_module(fresh_mariadb_container):
+    """
+    Drop and recreate the database for each test module to ensure clean state.
+    
+    This prevents tests from different modules from interfering with each other
+    by ensuring each module starts with a completely fresh database.
+    """
+    container_info = fresh_mariadb_container
+    
+    print(f"\nDropping and recreating database for test module...")
+    
+    # Connect as root to drop/create database
+    try:
+        import mariadb
+        root_conn = mariadb.connect(
+            host=container_info["host"],
+            port=container_info["port"],
+            user="root",
+            password="root",
+            connect_timeout=10,
+            read_timeout=10,
+            write_timeout=10
+        )
+        
+        with root_conn.cursor() as cursor:
+            # Drop the database completely
+            cursor.execute(f"DROP DATABASE IF EXISTS {container_info['database']}")
+            # Recreate it fresh
+            cursor.execute(f"CREATE DATABASE {container_info['database']}")
+            # Grant permissions to test user
+            cursor.execute(f"GRANT ALL PRIVILEGES ON {container_info['database']}.* TO '{container_info['user']}'@'%'")
+            cursor.execute("FLUSH PRIVILEGES")
+        
+        root_conn.close()
+        print(f"Database {container_info['database']} recreated successfully")
+        
+    except Exception as e:
+        print(f"Warning: Could not recreate database: {e}")
+    
+    yield container_info
+
+
+@pytest.fixture(scope="module")
+def safe_test_env(fresh_database_per_module):
     """
     Set up safe test environment variables that point to the fresh database.
     
     This fixture overrides potentially dangerous environment variables like
     MYSQL_HOST to ensure tests never accidentally connect to production.
     """
-    container_info = fresh_mariadb_container
+    container_info = fresh_database_per_module
     
     # Safe test environment that points to our fresh container
     safe_env = {
@@ -197,7 +240,7 @@ def safe_test_env(fresh_mariadb_container):
 
 
 @pytest.fixture
-def fresh_tonydbc_instance(safe_test_env):
+def fresh_tonydbc_instance(fresh_database_per_module, safe_test_env):
     """
     Create a TonyDBC instance connected to the fresh test database.
     
@@ -233,11 +276,11 @@ def pytest_sessionfinish(session, exitstatus):
 
 
 # Legacy fixture names for backward compatibility
-@pytest.fixture(scope="session")
-def mariadb_container(fresh_mariadb_container):
-    """Legacy alias for fresh_mariadb_container"""
+@pytest.fixture(scope="module")
+def mariadb_container(fresh_database_per_module):
+    """Legacy alias for fresh_database_per_module"""
     # Convert to the format expected by existing tests
-    container_info = fresh_mariadb_container
+    container_info = fresh_database_per_module
     return SimpleNamespace(
         get_container_host_ip=lambda: container_info["host"],
         get_exposed_port=lambda _p: container_info["port"],

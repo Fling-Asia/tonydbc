@@ -43,10 +43,10 @@ def setup_tables(fresh_tonydbc_instance):
             )
         """)
 
-        # Create a users table
+        # Create a users table (same structure as fresh_database tests)
         db.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                user_id INT AUTO_INCREMENT PRIMARY KEY,
+                id INT AUTO_INCREMENT PRIMARY KEY,
                 username VARCHAR(50),
                 email VARCHAR(100)
             )
@@ -54,10 +54,14 @@ def setup_tables(fresh_tonydbc_instance):
 
         yield db
 
-        # Cleanup
+        # Cleanup - drop in correct order to handle foreign key constraints
+        # First drop any tables that might reference users
+        db.execute("SET FOREIGN_KEY_CHECKS = 0")  # Temporarily disable FK checks
+        db.execute("DROP TABLE IF EXISTS posts")  # From fresh_database tests
         db.execute("DROP TABLE IF EXISTS test_table")
-        db.execute("DROP TABLE IF EXISTS no_pk_table")
+        db.execute("DROP TABLE IF EXISTS no_pk_table") 
         db.execute("DROP TABLE IF EXISTS users")
+        db.execute("SET FOREIGN_KEY_CHECKS = 1")  # Re-enable FK checks
 
 
 class TestTonyDBCIntegration:
@@ -73,7 +77,7 @@ class TestTonyDBCIntegration:
 
         # Test table with primary key (users)
         result = db.get_primary_key("users")
-        assert result == "user_id"
+        assert result == "id"
 
     def test_get_primary_key_with_default_real_table(self, setup_tables):
         """Test get_primary_key returns default when table has no primary key"""
@@ -256,6 +260,7 @@ class TestTonyDBCIntegration:
     def test_sortie_append_with_timestamps(self, fresh_tonydbc_instance):
         """Create `sortie` table and append a tz-aware dataframe without errors."""
         with fresh_tonydbc_instance as db:
+            
             # Create referenced tables for foreign keys
             db.execute(
                 """
@@ -387,11 +392,7 @@ class TestTonyDBCIntegration:
                         == sortie_df.iloc[0][k]
                     )
 
-            # Cleanup created tables
-            db.execute("DROP TABLE IF EXISTS `sortie`;")
-            db.execute("DROP TABLE IF EXISTS `flightplan`;")
-            db.execute("DROP TABLE IF EXISTS `subsoi`;")
-            db.execute("DROP TABLE IF EXISTS `stock_check`;")
+            # No cleanup needed - fresh database per module
 
     def test_nullable_datatypes_with_null_values(self, setup_tables):
         """Test that NULL values in database are properly handled with nullable pandas datatypes"""
