@@ -38,9 +38,9 @@ def setup_test_user_table(safe_test_env):
         user=safe_test_env["user"],
         password=safe_test_env["password"],
         database=safe_test_env["database"],
-        force_no_audit=True
+        force_no_audit=True,
     )
-    
+
     with db:
         # Create a simple user table for testing
         db.execute("""
@@ -50,15 +50,17 @@ def setup_test_user_table(safe_test_env):
                 email VARCHAR(100) NOT NULL
             )
         """)
-        
+
         # Insert some test data
-        test_users = pd.DataFrame([
-            {"name": "John Doe", "email": "john@example.com"},
-            {"name": "Jane Smith", "email": "jane@example.com"},
-            {"name": "Bob Johnson", "email": "bob@example.com"}
-        ])
+        test_users = pd.DataFrame(
+            [
+                {"name": "John Doe", "email": "john@example.com"},
+                {"name": "Jane Smith", "email": "jane@example.com"},
+                {"name": "Bob Johnson", "email": "bob@example.com"},
+            ]
+        )
         db.append_to_table("user", test_users)
-        
+
         yield safe_test_env
 
 
@@ -99,14 +101,18 @@ class TestAuditPath:
                     user=setup_test_user_table["user"],
                     password=setup_test_user_table["password"],
                     database=setup_test_user_table["database"],
-                    force_no_audit=True
+                    force_no_audit=True,
                 )
-                
+
                 with check_db:
                     # Check that audit records exist in the tony table
-                    audit_records = check_db.get_data("SELECT * FROM tony WHERE query LIKE '%SELECT * FROM user LIMIT 1%'")
-                    assert len(audit_records) > 0, "No audit records found in tony table"
-                    
+                    audit_records = check_db.get_data(
+                        "SELECT * FROM tony WHERE query LIKE '%SELECT * FROM user LIMIT 1%'"
+                    )
+                    assert len(audit_records) > 0, (
+                        "No audit records found in tony table"
+                    )
+
                     # Verify audit record contains expected fields
                     record = audit_records[0]
                     assert record["table_name"] == "user"
@@ -118,9 +124,11 @@ class TestAuditPath:
     def test_audit_path_csv_file_logging(self, setup_test_user_table):
         """Test AUDIT_PATH = '/path/to/file.csv' logs to CSV file"""
         # Create a temporary CSV file for audit logging
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".csv", delete=False
+        ) as temp_file:
             csv_path = temp_file.name
-        
+
         try:
             # Set AUDIT_PATH to the CSV file path
             with patch.dict(os.environ, {"AUDIT_PATH": csv_path}):
@@ -148,11 +156,11 @@ class TestAuditPath:
 
             # Check that the CSV file contains audit records
             assert Path(csv_path).exists(), "CSV audit file was not created"
-            
+
             # Read the CSV file and verify it contains audit data
             audit_df = pd.read_csv(csv_path)
             assert len(audit_df) > 0, "No audit records found in CSV file"
-            
+
             # Verify audit record contains expected fields
             record = audit_df.iloc[0]
             assert record["table_name"] == "user"
@@ -160,7 +168,7 @@ class TestAuditPath:
             assert record["method"] == "get_data"
             assert record["num_rows"] == 1
             assert pd.notna(record["duration_seconds"])
-            
+
         finally:
             # Clean up the temporary CSV file
             if Path(csv_path).exists():
@@ -182,7 +190,7 @@ class TestAuditPath:
             with audit_db:
                 # Verify audit is disabled
                 assert audit_db.do_audit is False
-                assert not hasattr(audit_db, 'ipath')
+                assert not hasattr(audit_db, "ipath")
 
                 # Execute a test query
                 result = audit_db.get_data("SELECT * FROM user LIMIT 1")
@@ -191,7 +199,7 @@ class TestAuditPath:
                 assert len(result) == 1
                 assert "name" in result[0]
                 assert "email" in result[0]
-                
+
                 # Verify no audit connection was created
                 assert audit_db._audit_db is None
 
@@ -206,13 +214,13 @@ class TestAuditPath:
                 user=safe_test_env["user"],
                 password=safe_test_env["password"],
                 database=safe_test_env["database"],
-                force_no_audit=True
+                force_no_audit=True,
             )
 
             with db:
                 # Verify audit is disabled despite AUDIT_PATH being set
                 assert db.do_audit is False
-                assert not hasattr(db, 'ipath')
+                assert not hasattr(db, "ipath")
 
     def test_audit_path_multiple_queries(self, setup_test_user_table):
         """Test multiple queries are all audited"""
@@ -236,7 +244,9 @@ class TestAuditPath:
                 # Verify all queries executed correctly
                 assert len(result1) == 1
                 assert len(result2) == 2
-                assert result3[0]["total"] >= 3  # At least 3 users (may be more from other tests)
+                assert (
+                    result3[0]["total"] >= 3
+                )  # At least 3 users (may be more from other tests)
 
                 # Check that all queries were audited
                 check_db = tonydbc.TonyDBC(
@@ -245,13 +255,17 @@ class TestAuditPath:
                     user=setup_test_user_table["user"],
                     password=setup_test_user_table["password"],
                     database=setup_test_user_table["database"],
-                    force_no_audit=True
+                    force_no_audit=True,
                 )
-                
+
                 with check_db:
                     # Check that audit records exist for all queries
-                    audit_records = check_db.get_data("SELECT * FROM tony WHERE table_name = 'user' ORDER BY id")
-                    assert len(audit_records) >= 3, f"Expected at least 3 audit records, found {len(audit_records)}"
+                    audit_records = check_db.get_data(
+                        "SELECT * FROM tony WHERE table_name = 'user' ORDER BY id"
+                    )
+                    assert len(audit_records) >= 3, (
+                        f"Expected at least 3 audit records, found {len(audit_records)}"
+                    )
 
     def test_audit_path_different_methods(self, setup_test_user_table):
         """Test that different TonyDBC methods are audited with correct method names"""
@@ -282,18 +296,26 @@ class TestAuditPath:
                     user=setup_test_user_table["user"],
                     password=setup_test_user_table["password"],
                     database=setup_test_user_table["database"],
-                    force_no_audit=True
+                    force_no_audit=True,
                 )
-                
+
                 with check_db:
                     # Check that audit records exist with correct method names
-                    audit_records = check_db.get_data("SELECT * FROM tony WHERE table_name = 'user' ORDER BY id")
-                    assert len(audit_records) >= 2, f"Expected at least 2 audit records, found {len(audit_records)}"
-                    
+                    audit_records = check_db.get_data(
+                        "SELECT * FROM tony WHERE table_name = 'user' ORDER BY id"
+                    )
+                    assert len(audit_records) >= 2, (
+                        f"Expected at least 2 audit records, found {len(audit_records)}"
+                    )
+
                     # Verify method names are recorded correctly
                     methods = [record["method"] for record in audit_records]
-                    assert "get_data" in methods, f"get_data method not found in audit records: {methods}"
-                    assert "query_table" in methods, f"query_table method not found in audit records: {methods}"
+                    assert "get_data" in methods, (
+                        f"get_data method not found in audit records: {methods}"
+                    )
+                    assert "query_table" in methods, (
+                        f"query_table method not found in audit records: {methods}"
+                    )
 
 
 if __name__ == "__main__":

@@ -459,7 +459,7 @@ class _TonyDBCOnlineOnly:
             return None  # Do not handle the exception; propagate it up
         else:
             self.log("TonyDBC: normal __exit__ successful.")
-            # (No need to return a value since `exit_type` is None.)
+            # (No need to return a value since `exc_type` is None.)
 
     def start_temp_conn(self) -> None:
         """Start using a temporary database connection"""
@@ -1816,8 +1816,8 @@ class TonyDBC(_TonyDBCOnlineOnly):
     def execute(
         self,
         command: str,
-        command_values=None,
-        before_retry_cmd=None,
+        command_values: tuple | None = None,
+        before_retry_cmd: str | None = None,
         no_tracking: bool = False,
         log_progress: bool = False,
     ) -> None:
@@ -1834,7 +1834,10 @@ class TonyDBC(_TonyDBCOnlineOnly):
             self.__update_queue.put(("execute", kwargs))
 
     def execute_script(
-        self, script_path: str, get_return_values=False, cur_database=None
+        self,
+        script_path: str,
+        get_return_values: bool = False,
+        cur_database: str | None = None,
     ) -> Any:
         kwargs = {
             "script_path": script_path,
@@ -1858,7 +1861,11 @@ class TonyDBC(_TonyDBCOnlineOnly):
             self.__update_queue.put(("insert_row_all_string", kwargs))
 
     def append_to_table(
-        self, table: str, df: pd.DataFrame, return_reindexed=False, no_tracking=False
+        self,
+        table: str,
+        df: pd.DataFrame,
+        return_reindexed: bool = False,
+        no_tracking: bool = False,
     ) -> pd.DataFrame | None:
         kwargs = {
             "table": table,

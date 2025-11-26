@@ -16,7 +16,9 @@ import mariadb  # type: ignore
 import pytest
 
 
-def _wait_for_database(host: str, port: int, user: str, password: str, database: str, timeout: int = 30) -> None:
+def _wait_for_database(
+    host: str, port: int, user: str, password: str, database: str, timeout: int = 30
+) -> None:
     """Wait for database to be ready with shorter timeout"""
     start_time = time.time()
     last_err = None
@@ -30,8 +32,8 @@ def _wait_for_database(host: str, port: int, user: str, password: str, database:
                 password=password,
                 database=database,
                 connect_timeout=5,  # Add connection timeout
-                read_timeout=5,     # Add read timeout
-                write_timeout=5     # Add write timeout
+                read_timeout=5,  # Add read timeout
+                write_timeout=5,  # Add write timeout
             )
             conn.close()
             print(f"Database ready at {host}:{port}")
@@ -41,7 +43,9 @@ def _wait_for_database(host: str, port: int, user: str, password: str, database:
             print(f"Waiting for database... ({e})")
             time.sleep(1)  # Shorter sleep
 
-    raise TimeoutError(f"Database not ready after {timeout} seconds; last error: {last_err}")
+    raise TimeoutError(
+        f"Database not ready after {timeout} seconds; last error: {last_err}"
+    )
 
 
 def _start_mariadb_container() -> dict[str, Any]:
@@ -51,10 +55,18 @@ def _start_mariadb_container() -> dict[str, Any]:
     # Stop and remove existing container if it exists
     try:
         print(f"Cleaning up any existing container: {container_name}")
-        subprocess.run(["docker", "stop", container_name],
-                      capture_output=True, check=False, timeout=10)
-        subprocess.run(["docker", "rm", container_name],
-                      capture_output=True, check=False, timeout=10)
+        subprocess.run(
+            ["docker", "stop", container_name],
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+        subprocess.run(
+            ["docker", "rm", container_name],
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
     except subprocess.TimeoutExpired:
         print("Warning: Container cleanup timed out")
     except Exception as e:
@@ -62,15 +74,24 @@ def _start_mariadb_container() -> dict[str, Any]:
 
     # Start new container with resource limits
     docker_cmd = [
-        "docker", "run", "-d", "--name", container_name,
-        "-p", "5000:3306",
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        container_name,
+        "-p",
+        "5000:3306",
         "--memory=512m",  # Limit memory
-        "--cpus=1.0",     # Limit CPU
-        "-e", "MYSQL_ROOT_PASSWORD=root",
-        "-e", "MYSQL_DATABASE=test_fresh_db",
-        "-e", "MYSQL_USER=test",
-        "-e", "MYSQL_PASSWORD=test",
-        "mariadb:10.6"
+        "--cpus=1.0",  # Limit CPU
+        "-e",
+        "MYSQL_ROOT_PASSWORD=root",
+        "-e",
+        "MYSQL_DATABASE=test_fresh_db",
+        "-e",
+        "MYSQL_USER=test",
+        "-e",
+        "MYSQL_PASSWORD=test",
+        "mariadb:10.6",
     ]
 
     print(f"Starting MariaDB container: {' '.join(docker_cmd)}")
@@ -92,7 +113,7 @@ def _start_mariadb_container() -> dict[str, Any]:
         "port": 5000,
         "database": "test_fresh_db",
         "user": "test",
-        "password": "test"
+        "password": "test",
     }
 
 
@@ -100,19 +121,35 @@ def _stop_mariadb_container(container_name: str) -> None:
     """Stop and remove the MariaDB container with timeout"""
     try:
         print(f"Stopping container: {container_name}")
-        subprocess.run(["docker", "stop", container_name],
-                      capture_output=True, check=True, timeout=15)
-        subprocess.run(["docker", "rm", container_name],
-                      capture_output=True, check=True, timeout=10)
+        subprocess.run(
+            ["docker", "stop", container_name],
+            capture_output=True,
+            check=True,
+            timeout=15,
+        )
+        subprocess.run(
+            ["docker", "rm", container_name],
+            capture_output=True,
+            check=True,
+            timeout=10,
+        )
         print(f"Container {container_name} stopped and removed")
     except subprocess.TimeoutExpired:
         print(f"Warning: Container {container_name} cleanup timed out")
         # Force kill if stop times out
         try:
-            subprocess.run(["docker", "kill", container_name],
-                          capture_output=True, check=False, timeout=5)
-            subprocess.run(["docker", "rm", "-f", container_name],
-                          capture_output=True, check=False, timeout=5)
+            subprocess.run(
+                ["docker", "kill", container_name],
+                capture_output=True,
+                check=False,
+                timeout=5,
+            )
+            subprocess.run(
+                ["docker", "rm", "-f", container_name],
+                capture_output=True,
+                check=False,
+                timeout=5,
+            )
             print(f"Container {container_name} force removed")
         except Exception as e:
             print(f"Force cleanup failed: {e}")
@@ -141,11 +178,11 @@ def fresh_mariadb_container():
         user=container_info["user"],
         password=container_info["password"],
         database=container_info["database"],
-        timeout=60
+        timeout=60,
     )
 
     # Store container info globally for cleanup
-    fresh_mariadb_container._container_info = container_info
+    fresh_mariadb_container._container_info = container_info  # type: ignore[attr-defined]
 
     yield container_info
 
@@ -167,6 +204,7 @@ def fresh_database_per_module(fresh_mariadb_container):
     # Connect as root to drop/create database
     try:
         import mariadb
+
         root_conn = mariadb.connect(
             host=container_info["host"],
             port=container_info["port"],
@@ -174,7 +212,7 @@ def fresh_database_per_module(fresh_mariadb_container):
             password="root",
             connect_timeout=10,
             read_timeout=10,
-            write_timeout=10
+            write_timeout=10,
         )
 
         with root_conn.cursor() as cursor:
@@ -183,7 +221,9 @@ def fresh_database_per_module(fresh_mariadb_container):
             # Recreate it fresh
             cursor.execute(f"CREATE DATABASE {container_info['database']}")
             # Grant permissions to test user
-            cursor.execute(f"GRANT ALL PRIVILEGES ON {container_info['database']}.* TO '{container_info['user']}'@'%'")
+            cursor.execute(
+                f"GRANT ALL PRIVILEGES ON {container_info['database']}.* TO '{container_info['user']}'@'%'"
+            )
             cursor.execute("FLUSH PRIVILEGES")
 
         root_conn.close()
@@ -227,7 +267,9 @@ def safe_test_env(fresh_database_per_module):
         original_env[key] = os.environ.get(key)
         os.environ[key] = value
 
-    print(f"Set safe test environment pointing to fresh database at {container_info['host']}:{container_info['port']}")
+    print(
+        f"Set safe test environment pointing to fresh database at {container_info['host']}:{container_info['port']}"
+    )
 
     yield container_info
 
@@ -249,6 +291,7 @@ def fresh_tonydbc_instance(fresh_database_per_module, safe_test_env):
     """
     # Import here to avoid circular imports and ensure env vars are set
     import sys
+
     sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
     import tonydbc
 
@@ -260,7 +303,7 @@ def fresh_tonydbc_instance(fresh_database_per_module, safe_test_env):
         user=container_info["user"],
         password=container_info["password"],
         database=container_info["database"],
-        force_no_audit=True  # Disable audit by default to avoid the initialization bug
+        force_no_audit=True,  # Disable audit by default to avoid the initialization bug
     )
 
     return db
@@ -269,10 +312,15 @@ def fresh_tonydbc_instance(fresh_database_per_module, safe_test_env):
 # Pytest hooks for session management
 def pytest_sessionfinish(session, exitstatus):
     """Clean up the MariaDB container at the end of the test session"""
-    if hasattr(fresh_mariadb_container, '_container_info') and fresh_mariadb_container._container_info:
+    if (
+        hasattr(fresh_mariadb_container, "_container_info")
+        and fresh_mariadb_container._container_info
+    ):
         print("\nCleaning up MariaDB container at end of test session...")
-        _stop_mariadb_container(fresh_mariadb_container._container_info["container_name"])
-        fresh_mariadb_container._container_info = None
+        _stop_mariadb_container(
+            fresh_mariadb_container._container_info["container_name"]
+        )
+        fresh_mariadb_container._container_info = None  # type: ignore[attr-defined]
 
 
 # Legacy fixture names for backward compatibility

@@ -896,7 +896,7 @@ class TestTonyDBCOnlineOnly:
         if call_args[0]:  # positional arguments
             query = call_args[0][0]
         else:  # keyword arguments
-            query = call_args[1].get('command', '')
+            query = call_args[1].get("command", "")
         assert "INSERT INTO test_table" in query
 
     def test_temp_id_table(self, tonydbc_instance):
@@ -952,7 +952,7 @@ class TestTonyDBCOnlineOnly:
             "log_state": "INFO",
             "log_event": "test_event",
             "log_message": "test log",
-            "log_hostname": "test_host"
+            "log_hostname": "test_host",
         }
 
         with patch.object(db, "execute") as mock_execute:
@@ -1063,7 +1063,7 @@ class TestTonyDBC:
             )
 
         # Check that the pickle path uses the custom media base path
-        assert "/custom/path" in db._TonyDBC__offline_pickle_path
+        assert "/custom/path" in db._TonyDBC__offline_pickle_path  # type: ignore[attr-defined]
 
     def test_is_online_property_getter(self, tonydbc_instance):
         """Test is_online property getter"""

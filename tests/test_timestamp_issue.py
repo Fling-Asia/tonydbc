@@ -19,6 +19,7 @@ import tonydbc
 
 # Container setup and fixtures are now provided by conftest.py
 
+
 # Legacy fixture for backward compatibility
 @pytest.fixture(scope="function")
 def tonydbc_instance(fresh_mariadb_container, safe_test_env):
@@ -30,13 +31,12 @@ def tonydbc_instance(fresh_mariadb_container, safe_test_env):
         port=container_info["port"],
         user=container_info["user"],
         password=container_info["password"],
-        database=container_info["database"]
+        database=container_info["database"],
     )
 
 
 @pytest.fixture(scope="function")
-def setup_tables(tonydbc_instance: Any
-) -> Generator[Any, None, None]:
+def setup_tables(tonydbc_instance: Any) -> Generator[Any, None, None]:
     """Set up the required tables for testing"""
 
     with tonydbc_instance as db:

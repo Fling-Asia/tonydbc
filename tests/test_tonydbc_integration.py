@@ -16,8 +16,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 
-
 # Container setup and fixtures are now provided by conftest.py
+
 
 @pytest.fixture
 def setup_tables(fresh_tonydbc_instance):
@@ -257,7 +257,6 @@ class TestTonyDBCIntegration:
     def test_sortie_append_with_timestamps(self, fresh_tonydbc_instance):
         """Create `sortie` table and append a tz-aware dataframe without errors."""
         with fresh_tonydbc_instance as db:
-
             # Create referenced tables for foreign keys
             db.execute(
                 """

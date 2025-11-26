@@ -6,6 +6,7 @@ that depend on Docker containers are executed.
 """
 
 import docker
+import docker.errors
 import pytest
 
 
@@ -40,7 +41,9 @@ class TestDockerAvailability:
                 client.images.get("mariadb:10.6")
                 print("MariaDB 10.6 image is available locally")
             except docker.errors.ImageNotFound:
-                print("MariaDB 10.6 image not found locally, checking if it can be pulled...")
+                print(
+                    "MariaDB 10.6 image not found locally, checking if it can be pulled..."
+                )
                 # Just verify we can access the registry, don't actually pull
                 client.api.inspect_distribution("mariadb:10.6")
                 print("MariaDB 10.6 image is available from Docker Hub")
@@ -61,7 +64,9 @@ class TestDockerAvailability:
             client = docker.from_env()
             # Try to list containers (this is a basic Docker operation)
             containers = client.containers.list(all=True)
-            print(f"Docker can list containers successfully ({len(containers)} containers found)")
+            print(
+                f"Docker can list containers successfully ({len(containers)} containers found)"
+            )
         except docker.errors.DockerException as e:
             pytest.fail(
                 f"Docker cannot list containers: {e}\n\n"

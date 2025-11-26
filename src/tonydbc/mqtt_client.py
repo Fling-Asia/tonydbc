@@ -1,6 +1,7 @@
 import datetime
 import json
 import uuid
+from types import TracebackType
 from typing import Any
 
 from paho.mqtt import client as mqtt
@@ -59,7 +60,10 @@ class MQTTClient:
         return self
 
     def __exit__(
-        self, exit_type: type | None, value: BaseException | None, traceback: Any | None
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         print(f"EXIT DIPS_MQTT_Logger {self.MQTTClient_id}")
         self.__mqtt_client.disconnect()

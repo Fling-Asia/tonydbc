@@ -14,7 +14,6 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 
-
 class TestFreshDatabase:
     """Test TonyDBC with fresh MariaDB database"""
 
@@ -41,9 +40,11 @@ class TestFreshDatabase:
             """)
 
             # Test data retrieval
-            result = connection.get_data("SELECT * FROM test_table WHERE name = 'test_record'")
+            result = connection.get_data(
+                "SELECT * FROM test_table WHERE name = 'test_record'"
+            )
             assert len(result) == 1
-            assert result[0]["name"] == 'test_record'
+            assert result[0]["name"] == "test_record"
             print("Table creation and data insertion test passed")
 
             # Verify we're connected to the correct database
@@ -58,7 +59,7 @@ class TestFreshDatabase:
         with fresh_tonydbc_instance as connection:
             # This should work without audit errors since AUDIT_PATH is set to ""
             result = connection.get_data("SELECT 'audit_disabled' as test")
-            assert result[0]["test"] == 'audit_disabled'
+            assert result[0]["test"] == "audit_disabled"
             print("Audit disabled test passed")
 
         # Test with FORCE_NO_AUDIT = True
@@ -66,7 +67,7 @@ class TestFreshDatabase:
             with fresh_tonydbc_instance as connection:
                 # This should also work without audit errors
                 result = connection.get_data("SELECT 'force_no_audit' as test")
-                assert result[0]["test"] == 'force_no_audit'
+                assert result[0]["test"] == "force_no_audit"
                 print("Force no audit test passed")
 
         print("All audit control tests passed!")
@@ -122,7 +123,7 @@ class TestFreshDatabase:
             """)
 
             assert len(posts_with_users) == 2
-            assert posts_with_users[0]["username"] == 'testuser1'
-            assert posts_with_users[1]["username"] == 'testuser2'
+            assert posts_with_users[0]["username"] == "testuser1"
+            assert posts_with_users[1]["username"] == "testuser2"
 
             print("Multiple database operations test passed")
