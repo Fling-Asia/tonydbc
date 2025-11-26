@@ -100,48 +100,48 @@ def serialize_table(
 
     return cur_df
 
-    # Serialization approach #1 (older): cast int and also float.
-    # We don't do ndarray anymore.  (we just use lists of lists and we do that with approach 2 below)
-    # Now cast the non-ndarray columns
-    int_cols = [
-        col
-        for col, dt in dict(col_dtypes).items()
-        if (dt is int or dt is np.int64) and col in cur_df.columns
-    ]
-    # Columns with NaN or None should use pandas nullable integer types
-    # Convert to proper nullable int types that can handle pd.NA
-    for col in int_cols:
-        if col in cur_df.columns:
-            # Convert to nullable integer type (Int64 for int64, Int32 for int32, etc.)
-            # these types properly handle None/NaN as pd.NA
-            target_dtype = dict(col_dtypes)[col]
-            if target_dtype is int or target_dtype is np.int64:
-                cur_df[col] = cur_df[col].astype("Int64")
-            elif target_dtype is np.int32:
-                cur_df[col] = cur_df[col].astype("Int32")
-            else:
-                cur_df[col] = cur_df[col].astype("Int64")
+    # # Serialization approach #1 (older): cast int and also float.
+    # # We don't do ndarray anymore.  (we just use lists of lists and we do that with approach 2 below)
+    # # Now cast the non-ndarray columns
+    # int_cols = [
+    #     col
+    #     for col, dt in dict(col_dtypes).items()
+    #     if (dt is int or dt is np.int64) and col in cur_df.columns
+    # ]
+    # # Columns with NaN or None should use pandas nullable integer types
+    # # Convert to proper nullable int types that can handle pd.NA
+    # for col in int_cols:
+    #     if col in cur_df.columns:
+    #         # Convert to nullable integer type (Int64 for int64, Int32 for int32, etc.)
+    #         # these types properly handle None/NaN as pd.NA
+    #         target_dtype = dict(col_dtypes)[col]
+    #         if target_dtype is int or target_dtype is np.int64:
+    #             cur_df[col] = cur_df[col].astype("Int64")
+    #         elif target_dtype is np.int32:
+    #             cur_df[col] = cur_df[col].astype("Int32")
+    #         else:
+    #             cur_df[col] = cur_df[col].astype("Int64")
 
-    # If we explicitly cast string columns to str instead of leaving them as object
-    # then None values will be replaced with 'None' and won't insert properly into the database
-    # so we don't bother to cast to str (object will work fine anyway)
-    for k, dtype in col_dtypes.items():
-        if k not in cur_df.columns:
-            continue
-        if dtype == np.ndarray or pd.api.types.is_string_dtype(dtype):
-            continue
-        # We will end up here if one of the values in an int column is a np.nan since np.nan cnanot be cast to int
-        # so let's ignore this error (??)
-        # TODO: fix KLUDGE (maybe iterate through each separately so at least we don't break early in the
-        # conversion process)
-        try:
-            cur_df[k] = cur_df[k].astype(dtype)
-        except Exception as e:
-            raise RuntimeError(
-                f"Column {k} with dtype {cur_df[k].dtype} could not be converted to {dtype}: {e}"
-            )
+    # # If we explicitly cast string columns to str instead of leaving them as object
+    # # then None values will be replaced with 'None' and won't insert properly into the database
+    # # so we don't bother to cast to str (object will work fine anyway)
+    # for k, dtype in col_dtypes.items():
+    #     if k not in cur_df.columns:
+    #         continue
+    #     if dtype == np.ndarray or pd.api.types.is_string_dtype(dtype):
+    #         continue
+    #     # We will end up here if one of the values in an int column is a np.nan since np.nan cnanot be cast to int
+    #     # so let's ignore this error (??)
+    #     # TODO: fix KLUDGE (maybe iterate through each separately so at least we don't break early in the
+    #     # conversion process)
+    #     try:
+    #         cur_df[k] = cur_df[k].astype(dtype)
+    #     except Exception as e:
+    #         raise RuntimeError(
+    #             f"Column {k} with dtype {cur_df[k].dtype} could not be converted to {dtype}: {e}"
+    #         )
 
-    return cur_df
+    # return cur_df
 
 
 def deserialize_table(

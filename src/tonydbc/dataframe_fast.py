@@ -16,28 +16,17 @@ import code
 import csv
 import os
 import tempfile
-from contextlib import AbstractContextManager
-from typing import Any, Protocol, cast
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
-from mariadb import Cursor, ProgrammingError  # type: ignore[import-untyped]
-from mariadb.constants import FIELD_TYPE, INDICATOR  # type: ignore[import-untyped]
+from mariadb import ProgrammingError  # type: ignore[import-untyped]
+from mariadb.constants import (
+    FIELD_TYPE,  # type: ignore[import-untyped]
+    INDICATOR,
+)
 
 from .env_utils import get_env_bool
-
-
-class DBConnectionProtocol(Protocol):
-    """Protocol for database connections that support get_data and get_type_codes methods"""
-
-    def get_data(self, query: str, no_tracking: bool = ...) -> list[dict[str, Any]]:  # type: ignore[misc]
-        ...
-
-    def get_type_codes(self, query: str) -> dict[str, str]: ...
-
-    def cursor(self) -> AbstractContextManager[Cursor]:  # type: ignore[type-arg]
-        ...
-
 
 # Map SQL types to pandas nullable datatypes
 DATATYPE_MAP = {
@@ -189,8 +178,8 @@ class DataFrameFast(pd.DataFrame):
             raise AssertionError(
                 "'replace' is not implemented correctly... it will erase the whole table!"
             )
-            with con.cursor() as cursor:
-                r = cursor.execute(f"TRUNCATE TABLE {name}")
+            # with con.cursor() as cursor:
+            #     r = cursor.execute(f"TRUNCATE TABLE {name}")
 
         # Nothing to do if the dataframe is empty
         if len(self) == 0:
