@@ -21,8 +21,8 @@ from typing import Any, Protocol, cast
 
 import numpy as np
 import pandas as pd
-from mariadb import Cursor, ProgrammingError
-from mariadb.constants import FIELD_TYPE, INDICATOR
+from mariadb import Cursor, ProgrammingError  # type: ignore[import-untyped]
+from mariadb.constants import FIELD_TYPE, INDICATOR  # type: ignore[import-untyped]
 
 from .env_utils import get_env_bool
 
