@@ -1041,7 +1041,7 @@ class _TonyDBCOnlineOnly:
             )
 
     def execute_script(
-        self, script_path: str, get_return_values=False, cur_database=None
+        self, script_path: str, get_return_values: bool = False, cur_database: str | None = None
     ):
         return_values: list[list[dict[str, Any]] | None] = []
         # Read the SQL schema file
