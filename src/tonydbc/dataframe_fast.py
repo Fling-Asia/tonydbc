@@ -16,13 +16,28 @@ import code
 import csv
 import os
 import tempfile
-from typing import Any, cast
+from contextlib import AbstractContextManager
+from typing import Any, Protocol, cast
 
-import mariadb  # type: ignore
 import numpy as np
 import pandas as pd
+from mariadb import Cursor, ProgrammingError
+from mariadb.constants import FIELD_TYPE, INDICATOR
 
 from .env_utils import get_env_bool
+
+
+class DBConnectionProtocol(Protocol):
+    """Protocol for database connections that support get_data and get_type_codes methods"""
+
+    def get_data(self, query: str, no_tracking: bool = ...) -> list[dict[str, Any]]:  # type: ignore[misc]
+        ...
+
+    def get_type_codes(self, query: str) -> dict[str, str]: ...
+
+    def cursor(self) -> AbstractContextManager[Cursor]:  # type: ignore[type-arg]
+        ...
+
 
 # Map SQL types to pandas nullable datatypes
 DATATYPE_MAP = {
@@ -139,7 +154,7 @@ def refine_dtype(data_type: str, column_type: str):
 
 
 # Get a lookup of what all the data_types are
-FIELD_TYPE = mariadb.constants.FIELD_TYPE
+
 FIELD_TYPE_DICT = {
     getattr(FIELD_TYPE, k): k for k in dir(FIELD_TYPE) if not k.startswith("_")
 }
@@ -155,7 +170,7 @@ class DataFrameFast(pd.DataFrame):
     def to_sql_fast(
         self,
         name: str,
-        con: mariadb.Connection,
+        con: Any,  # DBConnectionProtocol - accepts any connection object with cursor method
         session_timezone: str,
         if_exists: str = "append",
         index: bool = False,
@@ -338,7 +353,7 @@ class DataFrameFast(pd.DataFrame):
 
             # "1. Special values like None or column default value needs to
             #     be indicated by an indicator."
-            MARIADB_NULL = mariadb.constants.INDICATOR.NULL
+            MARIADB_NULL = INDICATOR.NULL
 
             def int_converter(v: Any) -> Any:
                 if isinstance(v, np.int64):
@@ -392,7 +407,7 @@ class DataFrameFast(pd.DataFrame):
                 if len(table_data_good) > 0:
                     try:
                         cursor.executemany(cmd, table_data_good)
-                    except mariadb.ProgrammingError as e:
+                    except ProgrammingError as e:
                         print(
                             f"Warning: problem with executemany; probably because you are using a "
                             f"np.dtypes.Int64DType data type.  We'll just insert these one at a time. {e}"
@@ -414,7 +429,10 @@ class DataFrameFast(pd.DataFrame):
                         cursor.execute(cmd, v)
 
     def column_info(
-        self, con: mariadb.Connection, table_name: str | None = None
+        self,
+        con: Any,
+        table_name: str
+        | None = None,  # DBConnectionProtocol - accepts any connection object with cursor method
     ) -> pd.DataFrame:
         """Returns the column information.
         Parameters:
@@ -443,7 +461,7 @@ class DataFrameFast(pd.DataFrame):
 
 def read_sql_table(
     name: str,
-    con: mariadb.Connection,
+    con: Any,  # DBConnectionProtocol - accepts any connection object with get_data, get_type_codes, and cursor methods
     query: str,
     *args: Any,
     **kwargs: Any,

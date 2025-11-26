@@ -667,10 +667,10 @@ class _TonyDBCOnlineOnly:
         self,
         table_name: str,
         blob_column: str,
-        id_value,
+        id_value: int | str,
         filepath: str,
         max_size_MB: int = 16,
-    ):
+    ) -> None:
         """Add a BLOB (Binary Large OBject) to the database, from a file
         This requires that the table row already exists; we are just updating it
 
@@ -1041,7 +1041,10 @@ class _TonyDBCOnlineOnly:
             )
 
     def execute_script(
-        self, script_path: str, get_return_values: bool = False, cur_database: str | None = None
+        self,
+        script_path: str,
+        get_return_values: bool = False,
+        cur_database: str | None = None,
     ):
         return_values: list[list[dict[str, Any]] | None] = []
         # Read the SQL schema file
@@ -1759,46 +1762,65 @@ class TonyDBC(_TonyDBCOnlineOnly):
         else:
             super(TonyDBC, self).refresh_table(table)
 
-    def update_table(self, table_name, df) -> None:
+    def update_table(self, table_name: str, df: pd.DataFrame) -> None:
         """Instead of actually updating the table, just enqueue the updates for doing later."""
-        kwargs = {"table_name": table_name, "df": df}
         if self.is_online:
-            super(TonyDBC, self).update_table(**kwargs)
+            super(TonyDBC, self).update_table(table_name=table_name, df=df)
         else:
+            kwargs = {"table_name": table_name, "df": df}
             self.__update_queue.put(("update_table", kwargs))
 
-    def write_dataframe(self, df, table_name, if_exists="replace", index=False) -> None:
-        kwargs = {
-            "df": df,
-            "table_name": table_name,
-            "if_exists": if_exists,
-            "index": index,
-        }
+    def write_dataframe(
+        self,
+        df: pd.DataFrame,
+        table_name: str,
+        if_exists: str = "replace",
+        index: bool = False,
+    ) -> None:
         if self.is_online:
-            super(TonyDBC, self).write_dataframe(**kwargs)
+            super(TonyDBC, self).write_dataframe(
+                df=df, table_name=table_name, if_exists=if_exists, index=index
+            )
         else:
+            kwargs = {
+                "df": df,
+                "table_name": table_name,
+                "if_exists": if_exists,
+                "index": index,
+            }
             self.__update_queue.put(("write_dataframe", kwargs))
 
     def update_blob(
-        self, table_name, blob_column, id_value, filepath, max_size_MB=16
+        self,
+        table_name: str,
+        blob_column: str,
+        id_value: int | str,
+        filepath: str,
+        max_size_MB: int = 16,
     ) -> None:
-        kwargs = {
-            "table_name": table_name,
-            "blob_column": blob_column,
-            "id_value": id_value,
-            "filepath": filepath,
-            "max_size_MB": max_size_MB,
-        }
         if self.is_online:
-            super(TonyDBC, self).update_blob(**kwargs)
+            super(TonyDBC, self).update_blob(
+                table_name=table_name,
+                blob_column=blob_column,
+                id_value=id_value,
+                filepath=filepath,
+                max_size_MB=max_size_MB,
+            )
         else:
+            kwargs = {
+                "table_name": table_name,
+                "blob_column": blob_column,
+                "id_value": id_value,
+                "filepath": filepath,
+                "max_size_MB": max_size_MB,
+            }
             self.__update_queue.put(("update_blob", kwargs))
 
     def post_data(self, query: str) -> Any:
-        kwargs = {"query": query}
         if self.is_online:
-            return super(TonyDBC, self).post_data(**kwargs)
+            return super(TonyDBC, self).post_data(query=query)
         else:
+            kwargs = {"query": query}
             self.__update_queue.put(("post_data", kwargs))
 
     def post_datalist(self, query: str, insert_data: list) -> Any:
@@ -1821,16 +1843,22 @@ class TonyDBC(_TonyDBCOnlineOnly):
         no_tracking: bool = False,
         log_progress: bool = False,
     ) -> None:
-        kwargs = {
-            "command": command,
-            "command_values": command_values,
-            "before_retry_cmd": before_retry_cmd,
-            "no_tracking": no_tracking,
-            "log_progress": log_progress,
-        }
         if self.is_online:
-            super(TonyDBC, self).execute(**kwargs)
+            super(TonyDBC, self).execute(
+                command=command,
+                command_values=command_values,
+                before_retry_cmd=before_retry_cmd,
+                no_tracking=no_tracking,
+                log_progress=log_progress,
+            )
         else:
+            kwargs = {
+                "command": command,
+                "command_values": command_values,
+                "before_retry_cmd": before_retry_cmd,
+                "no_tracking": no_tracking,
+                "log_progress": log_progress,
+            }
             self.__update_queue.put(("execute", kwargs))
 
     def execute_script(
@@ -1839,14 +1867,18 @@ class TonyDBC(_TonyDBCOnlineOnly):
         get_return_values: bool = False,
         cur_database: str | None = None,
     ) -> Any:
-        kwargs = {
-            "script_path": script_path,
-            "get_return_values": get_return_values,
-            "cur_database": cur_database,
-        }
         if self.is_online:
-            return super(TonyDBC, self).execute_script(**kwargs)
+            return super(TonyDBC, self).execute_script(
+                script_path=script_path,
+                get_return_values=get_return_values,
+                cur_database=cur_database,
+            )
         else:
+            kwargs = {
+                "script_path": script_path,
+                "get_return_values": get_return_values,
+                "cur_database": cur_database,
+            }
             self.__update_queue.put(("execute_script", kwargs))
 
     def insert_row_all_string(self, table: str, row_dict: dict[str, str]) -> None:
@@ -1867,25 +1899,30 @@ class TonyDBC(_TonyDBCOnlineOnly):
         return_reindexed: bool = False,
         no_tracking: bool = False,
     ) -> pd.DataFrame | None:
-        kwargs = {
-            "table": table,
-            "df": df,
-            "return_reindexed": return_reindexed,
-            "no_tracking": no_tracking,
-        }
         if self.is_online:
-            return super(TonyDBC, self).append_to_table(**kwargs)
+            return super(TonyDBC, self).append_to_table(
+                table=table,
+                df=df,
+                return_reindexed=return_reindexed,
+                no_tracking=no_tracking,
+            )
         else:
             if return_reindexed:
                 raise AssertionError(
                     "TonyDBC.append_to_table: cannot return reindexed while in `offline` mode"
                 )
+            kwargs = {
+                "table": table,
+                "df": df,
+                "return_reindexed": return_reindexed,
+                "no_tracking": no_tracking,
+            }
             self.__update_queue.put(("append_to_table", kwargs))
             return None
 
     def log_to_db(self, log_dict: dict) -> None:
-        kwargs = {"log_dict": log_dict}
         if self.is_online:
-            super(TonyDBC, self).log_to_db(**kwargs)
+            super(TonyDBC, self).log_to_db(log_dict=log_dict)
         else:
+            kwargs = {"log_dict": log_dict}
             self.__update_queue.put(("log_to_db", kwargs))

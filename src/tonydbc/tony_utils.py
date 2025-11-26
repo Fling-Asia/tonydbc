@@ -31,21 +31,21 @@ from .env_utils import get_env_bool
 
 # A custom encoder to handle np.int64 and other non-serializable types
 class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj: Any) -> Any:
-        if isinstance(obj, np.integer):
-            return int(obj)  # Convert any numpy integer to Python int
-        if isinstance(obj, np.floating):
-            return float(obj)  # Convert any numpy float to Python float
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()  # Convert numpy arrays to Python lists
-        if isinstance(obj, list):
+    def default(self, o: Any) -> Any:
+        if isinstance(o, np.integer):
+            return int(o)  # Convert any numpy integer to Python int
+        if isinstance(o, np.floating):
+            return float(o)  # Convert any numpy float to Python float
+        if isinstance(o, np.ndarray):
+            return o.tolist()  # Convert numpy arrays to Python lists
+        if isinstance(o, list):
             # Recursively convert numpy integers within lists
             return [
                 int(item) if np.issubdtype(type(item), np.integer) else item
-                for item in obj
+                for item in o
             ]
         # Let the base class handle other types
-        return super(NumpyEncoder, self).default(obj)
+        return super(NumpyEncoder, self).default(o)
 
 
 def serialize_table(
@@ -222,7 +222,7 @@ def get_current_time(
         else:
             default_timezone = "Asia/Bangkok"
     if use_utc:
-        return datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
+        return datetime.datetime.now(datetime.timezone.utc)
     else:
         return datetime.datetime.now(pytz.timezone(default_timezone))
 
