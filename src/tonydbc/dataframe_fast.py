@@ -20,8 +20,8 @@ from typing import Any, cast
 
 import numpy as np
 import pandas as pd
-from mariadb import ProgrammingError  # type: ignore[import-untyped]
-from mariadb.constants import FIELD_TYPE, INDICATOR  # type: ignore[import-untyped]
+from mariadb import ProgrammingError
+from mariadb.constants import FIELD_TYPE, INDICATOR
 
 from .env_utils import get_env_bool
 
@@ -43,6 +43,8 @@ DATATYPE_MAP = {
     "blob": "object",  # Keep as object for binary data
     "mediumblob": "object",  # Keep as object for binary data
     "longblob": "object",  # Keep as object for binary data
+    "medium_blob": "object",  # Keep as object for binary data
+    "long_blob": "object",  # Keep as object for binary data
     "bigint": "Int64",
     "shorttext": "string",
     "mediumtext": "string",
